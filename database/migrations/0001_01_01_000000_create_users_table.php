@@ -35,6 +35,16 @@ return new class extends Migration
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
+
+        Schema::create('user_songs', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('song_id');
+            $table->string('title');
+            $table->string('artist');
+            $table->timestamp('played_at')->useCurrent();
+            $table->timestamps();
+        });
     }
 
     /**
@@ -45,5 +55,6 @@ return new class extends Migration
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('user_songs');
     }
 };
