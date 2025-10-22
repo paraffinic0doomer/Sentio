@@ -8,77 +8,26 @@ use Illuminate\Support\Facades\Http;
 class LlmService
 {
     protected $youtubeKey;
-    protected $useDummy;
 
-    public function __construct($useDummy = true)
+    public function __construct()
     {
-        $this->youtubeKey = 'AIzaSyDG9b_9nvvA3u1m6pzES-oytl-H_RSwOQk';
-        $this->useDummy = $useDummy; // true = dummy mode, false = GPT4All mode
+        $this->youtubeKey = env('YOUTUBE_API_KEY');
     }
-
+    
     public function getRecommendations($feeling)
     {
         Log::info('Received mood: ' . $feeling);
 
-        if ($this->useDummy) {
-            // ---------- Dummy mode ----------
-            return $this->getDummySongsByMood($feeling);
+        // Get song recommendations from Groq
+        $songs = $this->getRecommendationFromGroq($feeling);
+
+        if (!$songs) {
+            return [];
         }
 
-        // ---------- GPT4All mode ----------
-        return $this->getRecommendationFromGPT4All($feeling);
-    }
-
-    /**
-     * Get dummy songs based on mood/feeling with YouTube data
-     */
-    private function getDummySongsByMood($feeling)
-    {
-        $feeling = strtolower(trim($feeling));
-        $dummySongs = [];
-
-        if (strpos($feeling, 'sad') !== false || strpos($feeling, 'depressed') !== false || strpos($feeling, 'lonely') !== false) {
-            $dummySongs = [
-                ['title' => 'Someone Like You', 'artist' => 'Adele'],
-                ['title' => 'The Night We Met', 'artist' => 'Lord Huron'],
-                ['title' => 'Creep', 'artist' => 'Radiohead'],
-            ];
-        } elseif (strpos($feeling, 'happy') !== false || strpos($feeling, 'joyful') !== false || strpos($feeling, 'excited') !== false) {
-            $dummySongs = [
-                ['title' => 'Happy', 'artist' => 'Pharrell Williams'],
-                ['title' => 'Good as Hell', 'artist' => 'Lizzo'],
-                ['title' => 'Walking on Sunshine', 'artist' => 'Katrina and the Waves'],
-            ];
-        } elseif (strpos($feeling, 'energetic') !== false || strpos($feeling, 'workout') !== false || strpos($feeling, 'motivated') !== false) {
-            $dummySongs = [
-                ['title' => 'Lose Yourself', 'artist' => 'Eminem'],
-                ['title' => 'Eye of the Tiger', 'artist' => 'Survivor'],
-                ['title' => 'Pump It Up', 'artist' => 'Endor'],
-            ];
-        } elseif (strpos($feeling, 'relaxed') !== false || strpos($feeling, 'chill') !== false || strpos($feeling, 'calm') !== false) {
-            $dummySongs = [
-                ['title' => 'Weightless', 'artist' => 'Marconi Union'],
-                ['title' => 'Sunset', 'artist' => 'The Midnight'],
-                ['title' => 'Breathe', 'artist' => 'Pink Floyd'],
-            ];
-        } elseif (strpos($feeling, 'romantic') !== false || strpos($feeling, 'love') !== false) {
-            $dummySongs = [
-                ['title' => 'Perfect', 'artist' => 'Ed Sheeran'],
-                ['title' => 'Thinking Out Loud', 'artist' => 'Ed Sheeran'],
-                ['title' => 'All of Me', 'artist' => 'John Legend'],
-            ];
-        } else {
-            // Default songs
-            $dummySongs = [
-                ['title' => 'Let It Be', 'artist' => 'The Beatles'],
-                ['title' => 'Bohemian Rhapsody', 'artist' => 'Queen'],
-                ['title' => 'Imagine', 'artist' => 'John Lennon'],
-            ];
-        }
-
-        // Fetch YouTube data for each dummy song
+        // Fetch YouTube data for each recommended song
         $recommendations = [];
-        foreach ($dummySongs as $song) {
+        foreach ($songs as $song) {
             $youtubeData = $this->getYouTubeData($song['title'], $song['artist']);
             if ($youtubeData) {
                 $recommendations[] = $youtubeData;
@@ -127,41 +76,49 @@ class LlmService
         }
     }
 
-    /**
-     * Get recommendation from GPT4All (for Tinker testing)
-     */
-    private function getRecommendationFromGPT4All($feeling)
+    private function getRecommendationFromGroq($feeling)
     {
         try {
-            $pythonPath = '/usr/bin/python3';
-            $gptScript = '/media/saif/New Volume/gpt4all/gpt4all_runner.py';
-            $escapedPrompt = escapeshellarg($feeling);
-            $command = "{$pythonPath} {$gptScript} {$escapedPrompt}";
-            $output = shell_exec($command);
+            $apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+            $apiKey = env('GROQ_API_KEY');
 
-            Log::info('GPT4All Output: ' . $output);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->post($apiUrl, [
+                'model' => 'llama-3.1-8b-instant',
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => "Recommend 3 songs for someone feeling {$feeling}. Provide in format: 1. Title - Artist\n2. Title - Artist\n3. Title - Artist",
+                    ],
+                ],
+            ]);
 
-            $result = json_decode($output, true);
+            $result = $response->json();
 
-            if (!$result || !isset($result['title']) || !isset($result['artist'])) {
-                Log::warning('GPT4All returned invalid data: ' . $output);
+            if (!$result || !isset($result['choices'][0]['message']['content'])) {
+                Log::warning('Groq API returned invalid data: ' . $response->body());
                 return null;
             }
 
-            $title = $result['title'];
-            $artist = $result['artist'];
+            $content = $result['choices'][0]['message']['content'];
 
-            // Search YouTube for the song
-            $youtubeData = $this->getYouTubeData($title, $artist);
-
-            if ($youtubeData) {
-                return [$youtubeData];
+            // Parse the response to extract songs
+            $songs = [];
+            $lines = explode("\n", $content);
+            foreach ($lines as $line) {
+                if (preg_match('/^\d+\.\s*(.+?)\s*-\s*(.+)$/', $line, $matches)) {
+                    $songs[] = [
+                        'title' => trim($matches[1]),
+                        'artist' => trim($matches[2]),
+                    ];
+                }
             }
 
-            return null;
-
+            return $songs;
         } catch (\Exception $e) {
-            Log::error('GPT4All request failed: ' . $e->getMessage());
+            Log::error('Groq API request failed: ' . $e->getMessage());
             return null;
         }
     }

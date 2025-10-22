@@ -26,4 +26,5 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/playlists/{id}/songs', [PlaylistController::class, 'getSongs'])->middleware('auth');
     Route::delete('/songs/{id}', [PlaylistController::class, 'deleteSong'])->middleware('auth');
     Route::get('/profile', [DashboardController::class, 'showProfile'])->name('profile')->middleware('auth');
+    Route::post('/add-to-playlist', [PlaylistController::class, 'addSong'])->name('playlists.addSong');
 });

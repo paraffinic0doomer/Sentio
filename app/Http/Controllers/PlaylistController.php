@@ -29,21 +29,30 @@ class PlaylistController extends Controller
 
     public function addSong(Request $request)
     {
-        $user = Auth::user();
-        
-        // Find or create playlist
-        $playlist = Playlist::firstOrCreate([
-            'name' => $request->playlist_name,
-            'user_id' => $user->id
+        $validated = $request->validate([
+            'song_id' => 'required|string',
+            'title' => 'required|string',
+            'artist' => 'required|string',
+            'playlist_name' => 'required|string',
+            'url' => 'required|url',
         ]);
 
-        // Add song to playlist_songs
+        $user = Auth::user();
+
+        // Find or create playlist
+        $playlist = Playlist::firstOrCreate([
+            'name' => $validated['playlist_name'],
+            'user_id' => $user->id,
+        ]);
+
+        // Add song to user_songs table
         UserSong::create([
+            'user_id' => $user->id,
             'playlist_id' => $playlist->id,
-            'title' => $request->title,
-            'artist' => $request->artist,
-            'url' => $request->url,
-            'thumbnail' => $request->thumbnail
+            'song_id' => $validated['song_id'],
+            'title' => $validated['title'],
+            'artist' => $validated['artist'],
+            'url' => $validated['url'],
         ]);
 
         return response()->json(['message' => 'Song added to playlist!']);

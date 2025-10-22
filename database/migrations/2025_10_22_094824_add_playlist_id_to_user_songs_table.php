@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('user_songs', function (Blueprint $table) {
-            $table->unsignedBigInteger('playlist_id')->after('user_id'); // Add playlist_id column
-            $table->foreign('playlist_id')->references('id')->on('playlists')->onDelete('cascade'); // Add foreign key constraint
+            //
         });
     }
 
@@ -23,8 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('user_songs', function (Blueprint $table) {
-            $table->dropForeign(['playlist_id']);
-            $table->dropColumn('playlist_id');
+            //
         });
     }
 };
