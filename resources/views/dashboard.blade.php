@@ -53,7 +53,10 @@
                 <div class="prompt-box">
                     <h4>How are you feeling today?</h4>
                     <textarea placeholder="Describe your mood or what's on your mind..."></textarea>
-                    <button>Get Recommendations</button>
+                    <button id="get-recommendations-btn">Get Recommendations</button>
+                    <div id="loading-spinner" style="display: none; margin-top: 10px;">
+                        <i class="fas fa-spinner fa-spin"></i> Getting recommendations...
+                    </div>
                 </div>
 
                 <!-- Recommendations Section -->
@@ -82,7 +85,7 @@
                     </div>
 
                                 <div class="song-actions">
-                                    <button class="play-btn" onclick="playSong('{{ $song->song_id }}')"><i class="fas fa-play"></i> Play</button>
+                                    <button class="play-btn" onclick="playSong('{{ $song->song_id }}', '{{ addslashes($song->title) }}', '{{ addslashes($song->artist) }}', '{{ $song->thumbnail }}', '{{ $song->url }}')"><i class="fas fa-play"></i> Play</button>
                                     <button class="add-playlist-btn" onclick="showPlaylistForm('{{ $song->song_id }}', '{{ $song->title }}', '{{ $song->artist }}', '{{ $song->url }}')"><i class="fas fa-plus"></i> Add</button>
                                 </div>
                             </div>
@@ -98,9 +101,13 @@
     <script>
         let currentSongData = null;
         // Get Recommendations
-        document.querySelector('.prompt-box button').addEventListener('click', function() {
+        document.getElementById('get-recommendations-btn').addEventListener('click', function() {
             const mood = document.querySelector('.prompt-box textarea').value.trim();
             if (mood) {
+                // Show loading
+                document.getElementById('loading-spinner').style.display = 'block';
+                this.disabled = true;
+
                 fetch('/get-recommendations', {
                     method: 'POST',
                     headers: {
@@ -127,7 +134,7 @@
                                     <p>${song.artist}</p>
                                 </div>
                                 <div class="song-actions">
-                                    <button class="play-btn" onclick="playSong('${song.id}')"><i class="fas fa-play"></i> Play</button>
+                                    <button class="play-btn" onclick="playSong('${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.thumbnail}', '${song.url}')"><i class="fas fa-play"></i> Play</button>
                                     <button class="add-playlist-btn" onclick="showPlaylistForm('${song.id}', '${song.title}', '${song.artist}', '${song.url}', '${song.thumbnail}')"><i class="fas fa-plus"></i> Add</button>
                                 </div>
                             `;
@@ -140,7 +147,15 @@
                         alert('Failed to get recommendations. Please try again.');
                     }
                 })
-                .catch(error => console.error('Error fetching recommendations:', error));
+                .catch(error => {
+                    console.error('Error fetching recommendations:', error);
+                    alert('Failed to get recommendations. Please try again.');
+                })
+                .finally(() => {
+                    // Hide loading
+                    document.getElementById('loading-spinner').style.display = 'none';
+                    this.disabled = false;
+                });
             } else {
                 alert('Please enter a mood to get recommendations.');
             }
@@ -259,9 +274,34 @@
             document.getElementById('playlistSelect').value = '';
         }
 
-        // Play Song (redirect to player page)
-        function playSong(songId) {
-            window.location.href = `/player/${songId}`;
+        // Play Song (save to database first, then redirect to player page)
+        function playSong(songId, title, artist, thumbnail, url) {
+            fetch('/play-song', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    song_id: songId,
+                    title: title,
+                    artist: artist,
+                    thumbnail: thumbnail,
+                    url: url
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = `/player/${songId}`;
+                } else {
+                    alert('Failed to play song. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error playing song:', error);
+                alert('Failed to play song. Please try again.');
+            });
         }
     </script>
 </body>

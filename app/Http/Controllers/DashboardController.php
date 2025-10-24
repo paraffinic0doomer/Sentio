@@ -24,11 +24,13 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        // Get last played songs for the logged-in user
+        // Get last played songs for the logged-in user (unique songs, latest to oldest)
         $lastPlayed = UserSong::where('user_id', $user->id)
-            ->latest()
-            ->take(5)
-            ->get();
+            ->whereNotNull('played_at')
+            ->orderBy('played_at', 'desc')
+            ->get()
+            ->unique('song_id')
+            ->take(5);
 
         return view('dashboard', compact('user', 'lastPlayed'));
     }
@@ -76,16 +78,20 @@ class DashboardController extends Controller
         $thumbnail = $request->input('thumbnail');
         $url = $request->input('url');
 
-        // Store the played song
-        UserSong::create([
-            'user_id' => Auth::id(),
-            'song_id' => $songId,
-            'title' => $title,
-            'artist' => $artist,
-            'thumbnail' => $thumbnail,
-            'url' => $url,
-            'played_at' => now(),
-        ]);
+        // Update or create the played song record
+        UserSong::updateOrCreate(
+            [
+                'user_id' => Auth::id(),
+                'song_id' => $songId,
+            ],
+            [
+                'title' => $title,
+                'artist' => $artist,
+                'thumbnail' => $thumbnail,
+                'url' => $url,
+                'played_at' => now(),
+            ]
+        );
 
         return response()->json(['status' => 'success']);
     }
