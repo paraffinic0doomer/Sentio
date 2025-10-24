@@ -27,6 +27,7 @@ class DashboardController extends Controller
         // Get last played songs for the logged-in user (unique songs, latest to oldest)
         $lastPlayed = UserSong::where('user_id', $user->id)
             ->whereNotNull('played_at')
+            ->where('played_at', '<=', now())
             ->orderBy('played_at', 'desc')
             ->get()
             ->unique('song_id')
@@ -46,19 +47,8 @@ class DashboardController extends Controller
         // Get recommendations using LlmService (Groq + yt-dlp)
         $recommendations = $this->llm->getRecommendations($feeling);
 
-        // Store the top recommendation as the "last played"
-        if (!empty($recommendations)) {
-            $firstSong = $recommendations[0];
-
-            UserSong::create([
-                'user_id' => Auth::id(),
-                'song_id' => $firstSong['id'],
-                'title' => $firstSong['title'],
-                'artist' => $firstSong['artist'],
-                'thumbnail' => $firstSong['thumbnail'],
-                'url' => $firstSong['url'],
-            ]);
-        }
+        // Note: We don't store recommendations in database until they're actually played
+        // This keeps the database clean and only tracks actually played songs
 
         return response()->json([
             'status' => 'success',
@@ -103,6 +93,7 @@ class DashboardController extends Controller
     {
         $songs = UserSong::where('user_id', Auth::id())
             ->whereNotNull('played_at')
+            ->where('played_at', '<=', now())
             ->orderBy('played_at', 'desc')
             ->get()
             ->unique('song_id')

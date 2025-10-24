@@ -75,15 +75,14 @@
                             <div class="song-card">
                                 <img src="{{ $song->thumbnail ?? asset('images/default-thumb.jpg') }}" alt="Thumbnail" class="song-thumb">
                                 <div class="song-info">
-                        <h5>{{ $song->title }}</h5>
-                 <p>{{ $song->artist }}</p>
-                     @if($song->played_at)
-                    <small>{{ \Carbon\Carbon::parse($song->played_at)->diffForHumans() }}</small>
-                     @else
-                    <small>N/A</small>
-                 @endif
-                    </div>
-
+                                    <h5>{{ $song->title }}</h5>
+                                    <p>{{ $song->artist }}</p>
+                                    @if($song->played_at)
+                                        <small>{{ \Carbon\Carbon::parse($song->played_at)->diffForHumans() }}</small>
+                                    @else
+                                        <small>N/A</small>
+                                    @endif
+                                </div>
                                 <div class="song-actions">
                                     <button class="play-btn" onclick="playSong('{{ $song->song_id }}', '{{ addslashes($song->title) }}', '{{ addslashes($song->artist) }}', '{{ $song->thumbnail }}', '{{ $song->url }}')"><i class="fas fa-play"></i> Play</button>
                                     <button class="add-playlist-btn" onclick="showPlaylistForm('{{ $song->song_id }}', '{{ $song->title }}', '{{ $song->artist }}', '{{ $song->url }}')"><i class="fas fa-plus"></i> Add</button>
