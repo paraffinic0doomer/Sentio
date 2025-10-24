@@ -33,17 +33,27 @@ class PlaylistController extends Controller
             'song_id' => 'required|string',
             'title' => 'required|string',
             'artist' => 'required|string',
-            'playlist_name' => 'required|string',
+            'playlist_id' => 'required|integer',
             'url' => 'required|url',
+            'thumbnail' => 'nullable|url'
         ]);
 
         $user = Auth::user();
 
-        // Find or create playlist
-        $playlist = Playlist::firstOrCreate([
-            'name' => $validated['playlist_name'],
-            'user_id' => $user->id,
-        ]);
+        // Check if playlist belongs to user
+        $playlist = Playlist::where('id', $validated['playlist_id'])
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        // Check if song already exists in playlist
+        $existingSong = UserSong::where('user_id', $user->id)
+            ->where('playlist_id', $validated['playlist_id'])
+            ->where('song_id', $validated['song_id'])
+            ->first();
+
+        if ($existingSong) {
+            return response()->json(['message' => 'Song already exists in this playlist!']);
+        }
 
         // Add song to user_songs table
         UserSong::create([
@@ -53,8 +63,46 @@ class PlaylistController extends Controller
             'title' => $validated['title'],
             'artist' => $validated['artist'],
             'url' => $validated['url'],
+            'thumbnail' => $validated['thumbnail'],
         ]);
 
         return response()->json(['message' => 'Song added to playlist!']);
+    }
+
+    public function createPlaylist(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255'
+        ]);
+
+        $user = Auth::user();
+
+        // Check if playlist with this name already exists
+        $existingPlaylist = Playlist::where('user_id', $user->id)
+            ->where('name', $validated['name'])
+            ->first();
+
+        if ($existingPlaylist) {
+            return response()->json(['error' => 'Playlist with this name already exists!'], 400);
+        }
+
+        $playlist = Playlist::create([
+            'name' => $validated['name'],
+            'user_id' => $user->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Playlist created!',
+            'playlist' => $playlist
+        ]);
+    }
+
+    public function getUserPlaylists()
+    {
+        $playlists = Playlist::where('user_id', Auth::id())
+            ->withCount('songs')
+            ->get();
+
+        return response()->json($playlists);
     }
 }

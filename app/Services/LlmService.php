@@ -4,85 +4,99 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 
 class LlmService
 {
-    protected $youtubeKey;
-
-    public function __construct()
-    {
-        $this->youtubeKey = env('YOUTUBE_API_KEY');
-    }
-    
+    /**
+     * Get recommendations based on mood using Groq + yt-dlp
+     */
     public function getRecommendations($feeling)
     {
         Log::info('Received mood: ' . $feeling);
 
-        // Get song recommendations from Groq
+        // Step 1: Get song suggestions (Title - Artist) from Groq
         $songs = $this->getRecommendationFromGroq($feeling);
 
-        if (!$songs) {
+        if (!$songs || empty($songs)) {
+            Log::warning('No songs returned from Groq for mood: ' . $feeling);
             return [];
         }
 
-        // Fetch YouTube data for each recommended song
+        // Step 2: Fetch metadata for each song using yt-dlp
         $recommendations = [];
         foreach ($songs as $song) {
-            $youtubeData = $this->getYouTubeData($song['title'], $song['artist']);
-            if ($youtubeData) {
-                $recommendations[] = $youtubeData;
+            $data = $this->getYtDlpMetadata("{$song['title']} {$song['artist']}");
+            if ($data) {
+                $recommendations[] = $data;
             }
         }
 
+        Log::info('Generated ' . count($recommendations) . ' recommendations via yt-dlp');
         return $recommendations;
     }
 
     /**
-     * Fetch proper YouTube data for a song
+     * Use yt-dlp to fetch metadata for a YouTube video search
      */
-    private function getYouTubeData($title, $artist)
+    private function getYtDlpMetadata($query)
     {
         try {
-            $response = Http::get('https://www.googleapis.com/youtube/v3/search', [
-                'key' => $this->youtubeKey,
-                'q' => "{$title} {$artist}",
-                'part' => 'snippet',
-                'maxResults' => 1,
-                'type' => 'video',
-            ]);
+            Log::info("Fetching metadata with yt-dlp for query: {$query}");
 
-            $data = $response->json();
+            // Use yt-dlp to search and get JSON result of top 1 video
+            $command = [
+                'yt-dlp',
+                'ytsearch1:' . $query,
+                '--skip-download',
+                '--print-json',
+                '--no-warnings',
+                '--no-playlist',
+                '--quiet'
+            ];
 
-            if (isset($data['items']) && count($data['items']) > 0) {
-                $item = $data['items'][0];
-                $videoId = $item['id']['videoId'];
-                $thumbnail = $item['snippet']['thumbnails']['high']['url'] ?? $item['snippet']['thumbnails']['medium']['url'];
+            $process = Process::timeout(30)->run($command);
 
-                return [
-                    'id' => $videoId,
-                    'title' => $title,
-                    'artist' => $artist,
-                    'url' => "https://www.youtube.com/watch?v={$videoId}",
-                    'thumbnail' => $thumbnail,
-                ];
+            if ($process->successful()) {
+                $output = trim($process->output());
+                $json = json_decode($output, true);
+
+                if (isset($json['id'])) {
+                    return [
+                        'id' => $json['id'],
+                        'title' => $json['title'] ?? 'Unknown Title',
+                        'artist' => $json['uploader'] ?? 'Unknown Artist',
+                        'url' => 'https://www.youtube.com/watch?v=' . $json['id'],
+                        'thumbnail' => $json['thumbnail'] ?? asset('images/cats.jpg'),
+                    ];
+                } else {
+                    Log::warning("yt-dlp returned no valid result for query: {$query}");
+                }
+            } else {
+                Log::error('yt-dlp failed: ' . $process->errorOutput());
             }
-
-            Log::warning("YouTube API: No results found for {$title} by {$artist}");
-            return null;
-
         } catch (\Exception $e) {
-            Log::error('YouTube API failed: ' . $e->getMessage());
-            return null;
+            Log::error('yt-dlp metadata fetch failed: ' . $e->getMessage());
         }
+
+        return null;
     }
 
+    /**
+     * Use Groq API to get song recommendations (title + artist)
+     */
     private function getRecommendationFromGroq($feeling)
     {
         try {
             $apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
             $apiKey = env('GROQ_API_KEY');
 
-            $response = Http::withHeaders([
+            if (!$apiKey) {
+                Log::error('GROQ_API_KEY not set in environment');
+                return null;
+            }
+
+            $response = Http::timeout(30)->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->post($apiUrl, [
@@ -90,35 +104,38 @@ class LlmService
                 'messages' => [
                     [
                         'role' => 'user',
-                        'content' => "Recommend 3 songs for someone feeling {$feeling}. Provide in format: 1. Title - Artist\n2. Title - Artist\n3. Title - Artist",
+                        'content' => "Recommend 3 songs for someone feeling {$feeling}. Format strictly as:\n1. Title - Artist\n2. Title - Artist\n3. Title - Artist",
                     ],
                 ],
+                'max_tokens' => 200,
+                'temperature' => 0.7,
             ]);
 
-            $result = $response->json();
-
-            if (!$result || !isset($result['choices'][0]['message']['content'])) {
-                Log::warning('Groq API returned invalid data: ' . $response->body());
+            if ($response->failed()) {
+                Log::error('Groq API request failed: ' . $response->status() . ' - ' . $response->body());
                 return null;
             }
 
-            $content = $result['choices'][0]['message']['content'];
+            $result = $response->json();
+            $content = $result['choices'][0]['message']['content'] ?? '';
 
-            // Parse the response to extract songs
+            Log::info('Groq response: ' . $content);
+
+            // Parse Groq response to extract song titles and artists
             $songs = [];
-            $lines = explode("\n", $content);
-            foreach ($lines as $line) {
-                if (preg_match('/^\d+\.\s*(.+?)\s*-\s*(.+)$/', $line, $matches)) {
+            foreach (explode("\n", $content) as $line) {
+                if (preg_match('/^\d+\.\s*(.+?)\s*-\s*(.+)$/', $line, $m)) {
                     $songs[] = [
-                        'title' => trim($matches[1]),
-                        'artist' => trim($matches[2]),
+                        'title' => trim($m[1]),
+                        'artist' => trim($m[2]),
                     ];
                 }
             }
 
+            Log::info('Parsed ' . count($songs) . ' songs from Groq response');
             return $songs;
         } catch (\Exception $e) {
-            Log::error('Groq API request failed: ' . $e->getMessage());
+            Log::error('Groq API error: ' . $e->getMessage());
             return null;
         }
     }

@@ -32,6 +32,7 @@
                     <li><a href="{{ route('dashboard') }}" class="active"><i class="fas fa-home"></i> Home</a></li>
                     <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
                     <li><a href="{{ route('playlists.index') }}"><i class="fas fa-list"></i> Playlists</a></li>
+                    <li><a href="{{ route('history') }}"><i class="fas fa-history"></i> History</a></li>
                     <li><a href="#"><i class="fas fa-smile"></i> Moods</a></li>
                     <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 </ul>
@@ -59,7 +60,7 @@
                 <div class="recommendations" id="recommendations-section" style="display: none;">
                     <h4>Recommendations</h4>
                     <div class="songs-grid" id="recommendations-grid">
-                        <!-- LLM-generated recommendations will appear here -->
+                        <!-- Songs appear here dynamically -->
                     </div>
                 </div>
 
@@ -68,11 +69,21 @@
                     <h4>Last Played</h4>
                     <div class="songs-grid">
                         @forelse($lastPlayed ?? [] as $song)
-                            <div class="song-card" onclick="playSong('{{ $song->song_id }}')">
-                                <div class="song-icon">♪</div>
+                            <div class="song-card">
+                                <img src="{{ $song->thumbnail ?? asset('images/default-thumb.jpg') }}" alt="Thumbnail" class="song-thumb">
                                 <div class="song-info">
-                                    <h5>{{ $song->title }}</h5>
-                                    <p>{{ $song->artist }}</p>
+                        <h5>{{ $song->title }}</h5>
+                 <p>{{ $song->artist }}</p>
+                     @if($song->played_at)
+                    <small>{{ \Carbon\Carbon::parse($song->played_at)->diffForHumans() }}</small>
+                     @else
+                    <small>N/A</small>
+                 @endif
+                    </div>
+
+                                <div class="song-actions">
+                                    <button class="play-btn" onclick="playSong('{{ $song->song_id }}')"><i class="fas fa-play"></i> Play</button>
+                                    <button class="add-playlist-btn" onclick="showPlaylistForm('{{ $song->song_id }}', '{{ $song->title }}', '{{ $song->artist }}', '{{ $song->url }}')"><i class="fas fa-plus"></i> Add</button>
                                 </div>
                             </div>
                         @empty
@@ -85,41 +96,49 @@
     </div>
 
     <script>
+        let currentSongData = null;
         // Get Recommendations
         document.querySelector('.prompt-box button').addEventListener('click', function() {
             const mood = document.querySelector('.prompt-box textarea').value.trim();
             if (mood) {
-                fetch('/recommendations', {
+                fetch('/get-recommendations', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
-                    body: JSON.stringify({ mood })
+                    body: JSON.stringify({ feeling: mood })
                 })
                 .then(response => response.json())
                 .then(data => {
                     console.log('Recommendations data:', data);
-                    const section = document.getElementById('recommendations-section');
-                    const grid = document.getElementById('recommendations-grid');
-                    grid.innerHTML = '';
+                    if (data.status === 'success' && data.recommendations) {
+                        const section = document.getElementById('recommendations-section');
+                        const grid = document.getElementById('recommendations-grid');
+                        grid.innerHTML = '';
 
-                    data.forEach(song => {
-                        const card = document.createElement('div');
-                        card.className = 'song-card';
-                        card.innerHTML = `
-                            <div class="song-icon">♪</div>
-                            <div class="song-info">
-                                <h5>${song.title}</h5>
-                                <p>${song.artist}</p>
-                                <p><a href="${song.url}" target="_blank" style="color: #007bff; text-decoration: none; font-size: 12px;">${song.url}</a></p>
-                                <button class="add-playlist-btn" onclick="showPlaylistForm('${song.id}', '${song.title}', '${song.artist}', '${song.url}')">➕ Add to Playlist</button>
-                            </div>
-                        `;
-                        grid.appendChild(card);
-                    });
+                        data.recommendations.forEach(song => {
+                            const card = document.createElement('div');
+                            card.className = 'song-card';
+                            card.innerHTML = `
+                                <img src="${song.thumbnail || '/images/default-thumb.jpg'}" alt="Thumbnail" class="song-thumb">
+                                <div class="song-info">
+                                    <h5>${song.title}</h5>
+                                    <p>${song.artist}</p>
+                                </div>
+                                <div class="song-actions">
+                                    <button class="play-btn" onclick="playSong('${song.id}')"><i class="fas fa-play"></i> Play</button>
+                                    <button class="add-playlist-btn" onclick="showPlaylistForm('${song.id}', '${song.title}', '${song.artist}', '${song.url}', '${song.thumbnail}')"><i class="fas fa-plus"></i> Add</button>
+                                </div>
+                            `;
+                            grid.appendChild(card);
+                        });
 
-                    section.style.display = 'block';
+                        section.style.display = 'block';
+                    } else {
+                        console.error('No recommendations received:', data);
+                        alert('Failed to get recommendations. Please try again.');
+                    }
                 })
                 .catch(error => console.error('Error fetching recommendations:', error));
             } else {
@@ -128,44 +147,155 @@
         });
 
         // Add to Playlist
-        function showPlaylistForm(songId, title, artist, url) {
-            const playlistName = prompt('Enter playlist name:');
-            if (playlistName) {
-                fetch('/add-to-playlist', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({
-                        song_id: songId,
-                        title: title,
-                        artist: artist,
-                        url: url,
-                        playlist_name: playlistName
-                    })
-                })
+        function showPlaylistForm(songId, title, artist, url, thumbnail = '') {
+            // Store song data
+            currentSongData = { songId, title, artist, url, thumbnail };
+
+            // Load user's playlists
+            fetch('/playlists/user')
                 .then(response => response.json())
-                .then(data => alert(data.message))
-                .catch(error => console.error('Error:', error));
-            }
+                .then(playlists => {
+                    const select = document.getElementById('playlistSelect');
+                    select.innerHTML = '<option value="">Select a playlist...</option>';
+
+                    playlists.forEach(playlist => {
+                        const option = document.createElement('option');
+                        option.value = playlist.id;
+                        option.textContent = `${playlist.name} (${playlist.songs_count} songs)`;
+                        select.appendChild(option);
+                    });
+
+                    document.getElementById('playlistModal').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error loading playlists:', error);
+                    alert('Failed to load playlists. Please try again.');
+                });
         }
 
-        // Play Song from Last Played
-        function playSong(songId) {
-            fetch('/play-song', {
+        function addToPlaylist() {
+            const playlistId = document.getElementById('playlistSelect').value;
+            const newPlaylistName = document.getElementById('newPlaylistName').value.trim();
+
+            if (!playlistId && !newPlaylistName) {
+                alert('Please select a playlist or enter a new playlist name.');
+                return;
+            }
+
+            let requestData;
+            let endpoint;
+
+            if (playlistId) {
+                // Add to existing playlist
+                requestData = {
+                    song_id: currentSongData.songId,
+                    title: currentSongData.title,
+                    artist: currentSongData.artist,
+                    url: currentSongData.url,
+                    thumbnail: currentSongData.thumbnail,
+                    playlist_id: playlistId
+                };
+                endpoint = '/add-to-playlist';
+            } else {
+                // Create new playlist and add song
+                requestData = {
+                    name: newPlaylistName
+                };
+                endpoint = '/playlists/create';
+            }
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({ song_id: songId })
+                body: JSON.stringify(requestData)
             })
             .then(response => response.json())
             .then(data => {
-                window.open(data.url, '_blank');
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                if (playlistId) {
+                    alert(data.message);
+                } else {
+                    // Created new playlist, now add the song to it
+                    return fetch('/add-to-playlist', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            song_id: currentSongData.songId,
+                            title: currentSongData.title,
+                            artist: currentSongData.artist,
+                            url: currentSongData.url,
+                            thumbnail: currentSongData.thumbnail,
+                            playlist_id: data.playlist.id
+                        })
+                    });
+                }
+            })
+            .then(response => {
+                if (response) return response.json();
+            })
+            .then(data => {
+                if (data) alert(data.message);
+                closePlaylistModal();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to add song to playlist. Please try again.');
             });
+        }
+
+        function closePlaylistModal() {
+            document.getElementById('playlistModal').style.display = 'none';
+            document.getElementById('newPlaylistName').value = '';
+            document.getElementById('playlistSelect').value = '';
+        }
+
+        // Play Song (redirect to player page)
+        function playSong(songId) {
+            window.location.href = `/player/${songId}`;
         }
     </script>
 </body>
 </html>
+
+<!-- Playlist Modal -->
+<div id="playlistModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add to Playlist</h2>
+            <span class="close" onclick="closePlaylistModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="playlistSelect">Select existing playlist:</label>
+                <select id="playlistSelect" class="form-control">
+                    <option value="">Loading playlists...</option>
+                </select>
+            </div>
+
+            <div class="or-divider">
+                <span>OR</span>
+            </div>
+
+            <div class="form-group">
+                <label for="newPlaylistName">Create new playlist:</label>
+                <input type="text" id="newPlaylistName" class="form-control" placeholder="Enter playlist name">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closePlaylistModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="addToPlaylist()">Add to Playlist</button>
+            </div>
+        </div>
+    </div>
+</div>
+

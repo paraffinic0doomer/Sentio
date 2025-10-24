@@ -95,6 +95,7 @@
                 <li><a href="{{ route('dashboard') }}"><i class="fas fa-home"></i> Home</a></li>
                 <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
                 <li><a href="{{ route('playlists.index') }}" class="active"><i class="fas fa-list"></i> Playlists</a></li>
+                <li><a href="{{ route('history') }}"><i class="fas fa-history"></i> History</a></li>
                 <li><a href="#"><i class="fas fa-smile"></i> Moods</a></li>
                 <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
             </ul>
@@ -129,6 +130,135 @@
         </main>
     </div>
 
+    <!-- Playlist Songs Modal -->
+    <div id="songsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="playlistTitle">Playlist</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <ul id="songsList" class="songs-list">
+                    <!-- Songs will be loaded here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-content {
+            background-color: #1e293b;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            color: white;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #ffffff;
+        }
+
+        .close {
+            color: #94a3b8;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #ffffff;
+        }
+
+        .modal-body {
+            padding: 1rem 1.5rem;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .songs-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .song-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        .song-item:last-child {
+            border-bottom: none;
+        }
+
+        .song-details {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+
+        .song-details h4 {
+            margin: 0 0 0.25rem 0;
+            color: #ffffff;
+        }
+
+        .song-details p {
+            margin: 0;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .song-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .play-btn, .delete-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .play-btn:hover {
+            color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .delete-btn:hover {
+            color: #ff4757;
+            background: rgba(255, 71, 87, 0.1);
+        }
+    </style>
+
     <script>
         function openPlaylist(id, name) {
             fetch(`/playlists/${id}/songs`)
@@ -145,11 +275,14 @@
                             li.className = 'song-item';
                             li.innerHTML = `
                                 <div class="song-details">
-                                    <h4>${song.title}</h4>
-                                    <p>${song.artist}</p>
+                                    <img src="${song.thumbnail || '/images/default-thumb.jpg'}" alt="Thumbnail" style="width: 50px; height: 50px; border-radius: 5px; margin-right: 1rem; object-fit: cover;">
+                                    <div>
+                                        <h4>${song.title}</h4>
+                                        <p>${song.artist}</p>
+                                    </div>
                                 </div>
                                 <div class="song-actions">
-                                    <button class="play-btn" onclick="playSong('${song.url}')"><i class="fas fa-play"></i></button>
+                                    <button class="play-btn" onclick="playSong('${song.song_id}')"><i class="fas fa-play"></i></button>
                                     <button class="delete-btn" onclick="deleteSong(${song.id})"><i class="fas fa-trash"></i></button>
                                 </div>
                             `;
@@ -165,8 +298,8 @@
             document.getElementById('songsModal').style.display = 'none';
         }
 
-        function playSong(url) {
-            window.open(url, '_blank');
+        function playSong(songId) {
+            window.location.href = `/player/${songId}`;
         }
 
         function deleteSong(id) {

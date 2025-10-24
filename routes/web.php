@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\InvidiousController;
 use App\Http\Controllers\PlaylistController;
 
-Route::get('/search', [InvidiousController::class, 'search']);
+Route::get('/search', [InvidiousController::class, 'search'])->name('search');
 
 
 Route::get('/', function () {
@@ -18,13 +18,23 @@ Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('l
 require __DIR__.'/auth.php';
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/search', [DashboardController::class, 'search'])->name('search');
-    Route::post('/recommendations', [DashboardController::class, 'getRecommendations']);
-    Route::post('/play-song', [DashboardController::class, 'playSong']);
-    Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index')->middleware('auth');
-    Route::get('/playlists/{id}/songs', [PlaylistController::class, 'getSongs'])->middleware('auth');
-    Route::delete('/songs/{id}', [PlaylistController::class, 'deleteSong'])->middleware('auth');
-    Route::get('/profile', [DashboardController::class, 'showProfile'])->name('profile')->middleware('auth');
     Route::post('/add-to-playlist', [PlaylistController::class, 'addSong'])->name('playlists.addSong');
+    
+    Route::get('/stream-audio/{songId}', [DashboardController::class, 'streamAudio'])->name('stream.audio');
+    
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/history', [DashboardController::class, 'history'])->name('history');
+    Route::post('/play-song', [DashboardController::class, 'playSong'])->name('play.song');
+    Route::post('/get-recommendations', [DashboardController::class, 'getRecommendations'])->name('get.recommendations');
+    Route::get('/profile', [DashboardController::class, 'showProfile'])->name('profile');
+    
+    // Music Player Route
+    Route::get('/player/{songId?}', [DashboardController::class, 'showPlayer'])->name('player');
+    
+    // Playlist routes
+    Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
+    Route::get('/playlists/user', [PlaylistController::class, 'getUserPlaylists'])->name('playlists.user');
+    Route::post('/playlists/create', [PlaylistController::class, 'createPlaylist'])->name('playlists.create');
+    Route::get('/playlists/{id}/songs', [PlaylistController::class, 'getSongs'])->name('playlists.songs');
+    Route::delete('/songs/{id}', [PlaylistController::class, 'deleteSong'])->name('songs.delete');
 });
