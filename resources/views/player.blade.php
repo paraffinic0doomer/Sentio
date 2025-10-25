@@ -288,7 +288,7 @@
         <main class="player-main">
             <div class="now-playing">
                 @if($currentSong)
-                    <img src="{{ $currentSong->thumbnail ?? asset('images/default-thumb.jpg') }}"
+                    <img src="{{ $currentSong->thumbnail ?? asset('images/cats.jpg') }}"
                          alt="Album Art"
                          class="album-art"
                          id="albumArt">
@@ -345,7 +345,7 @@
                         <div class="playlist-item {{ $currentSong && $currentSong->song_id == $song->song_id ? 'playing' : '' }}"
                              data-song-id="{{ $song->song_id }}"
                              onclick="playSong('{{ $song->song_id }}')">
-                            <img src="{{ $song->thumbnail ?? asset('images/default-thumb.jpg') }}"
+                            <img src="{{ $song->thumbnail ?? asset('images/cats.jpg') }}"
                                  alt="Thumbnail"
                                  class="playlist-thumb">
                             <div class="playlist-info">
@@ -413,7 +413,7 @@
                 document.getElementById('trackTitle').textContent = song.title;
                 document.getElementById('trackArtist').textContent = song.artist;
                 if (albumArt) {
-                    albumArt.src = song.thumbnail || '/images/default-thumb.jpg';
+                    albumArt.src = song.thumbnail || '/images/cats.jpg';
                 }
                 updatePlaylistUI(songId);
             }

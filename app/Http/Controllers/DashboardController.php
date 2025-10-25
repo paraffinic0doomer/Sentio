@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use App\Services\LlmService;
 use App\Models\UserSong;
+use App\Models\Playlist;
 
 class DashboardController extends Controller
 {
@@ -33,7 +34,21 @@ class DashboardController extends Controller
             ->unique('song_id')
             ->take(5);
 
-        return view('dashboard', compact('user', 'lastPlayed'));
+        // Ensure complete data for each song before displaying
+        foreach ($lastPlayed as $song) {
+            $this->ensureCompleteSongData($song->song_id, $song->url, $song->title, $song->artist, $song->thumbnail);
+        }
+
+        // Refresh the collection with updated data from database
+        $lastPlayed = UserSong::where('user_id', $user->id)
+            ->whereNotNull('played_at')
+            ->where('played_at', '<=', now())
+            ->orderBy('played_at', 'desc')
+            ->get()
+            ->unique('song_id')
+            ->take(5);
+
+        return view('dashboard', compact('lastPlayed'));
     }
 
     /**
@@ -68,6 +83,9 @@ class DashboardController extends Controller
         $thumbnail = $request->input('thumbnail');
         $url = $request->input('url');
 
+        // Ensure complete song data is in database
+        $songData = $this->ensureCompleteSongData($songId, $url, $title, $artist, $thumbnail);
+
         // Update or create the played song record
         UserSong::updateOrCreate(
             [
@@ -75,10 +93,10 @@ class DashboardController extends Controller
                 'song_id' => $songId,
             ],
             [
-                'title' => $title,
-                'artist' => $artist,
-                'thumbnail' => $thumbnail,
-                'url' => $url,
+                'title' => $songData['title'],
+                'artist' => $songData['artist'],
+                'thumbnail' => $songData['thumbnail'],
+                'url' => $songData['url'],
                 'played_at' => now(),
             ]
         );
@@ -87,10 +105,81 @@ class DashboardController extends Controller
     }
 
     /**
+     * Ensure complete song data is in database, fetch missing data from yt-dlp
+     */
+    private function ensureCompleteSongData($songId, $url, $providedTitle = null, $providedArtist = null, $providedThumbnail = null)
+    {
+        $userId = Auth::id();
+
+        // Check if song exists in database for this user
+        $song = UserSong::where('user_id', $userId)
+            ->where('song_id', $songId)
+            ->first();
+
+        $needsUpdate = false;
+        $updateData = [];
+
+        if (!$song) {
+            // Song not in database, fetch all data
+            $fetchedData = $this->fetchSongData($url);
+            return [
+                'title' => $fetchedData['title'] ?? $providedTitle,
+                'artist' => $fetchedData['artist'] ?? $providedArtist,
+                'thumbnail' => $fetchedData['thumbnail'] ?? $providedThumbnail,
+                'url' => $url,
+            ];
+        } else {
+            // Song exists, check for missing data
+            if (empty($song->title)) {
+                $needsUpdate = true;
+                $updateData['title'] = $providedTitle ?? $this->fetchSongData($url)['title'];
+            }
+            if (empty($song->artist)) {
+                $needsUpdate = true;
+                $updateData['artist'] = $providedArtist ?? $this->fetchSongData($url)['artist'];
+            }
+            if (empty($song->thumbnail)) {
+                $needsUpdate = true;
+                // Fetch thumbnail
+                $updateData['thumbnail'] = $this->fetchThumbnail($url);
+            }
+            if (empty($song->url)) {
+                $needsUpdate = true;
+                $updateData['url'] = $url;
+            }
+
+            if ($needsUpdate) {
+                $song->update($updateData);
+            }
+
+            return [
+                'title' => $song->title,
+                'artist' => $song->artist,
+                'thumbnail' => $song->thumbnail,
+                'url' => $song->url,
+            ];
+        }
+    }
+
+    /**
      * Show user listening history
      */
     public function history()
     {
+        $songs = UserSong::where('user_id', Auth::id())
+            ->whereNotNull('played_at')
+            ->where('played_at', '<=', now())
+            ->orderBy('played_at', 'desc')
+            ->get()
+            ->unique('song_id')
+            ->take(20);
+
+        // Ensure complete data for each song before displaying
+        foreach ($songs as $song) {
+            $this->ensureCompleteSongData($song->song_id, $song->url, $song->title, $song->artist, $song->thumbnail);
+        }
+
+        // Refresh the collection with updated data from database
         $songs = UserSong::where('user_id', Auth::id())
             ->whereNotNull('played_at')
             ->where('played_at', '<=', now())
@@ -157,9 +246,19 @@ class DashboardController extends Controller
                 $currentSong = UserSong::where('song_id', $songId)->first();
             }
 
+            // Ensure complete data for currentSong
+            if ($currentSong) {
+                $this->ensureCompleteSongData($currentSong->song_id, $currentSong->url, $currentSong->title, $currentSong->artist, $currentSong->thumbnail);
+                // Refresh the song data
+                $currentSong = UserSong::where('song_id', $songId)
+                    ->where('user_id', $user->id)
+                    ->first() ?? $currentSong;
+            }
+
+            // Get all user songs for the playlist, ordered by most recently played first
             $playlist = UserSong::where('user_id', $user->id)
-                ->whereNotNull('played_at')
                 ->orderBy('played_at', 'desc')
+                ->orderBy('created_at', 'desc')
                 ->get()
                 ->unique('song_id')
                 ->values();
@@ -172,10 +271,10 @@ class DashboardController extends Controller
                 $currentIndex = 0;
             }
         } else {
-            // Get user's recent songs
+            // Get all user songs
             $playlist = UserSong::where('user_id', $user->id)
-                ->whereNotNull('played_at')
                 ->orderBy('played_at', 'desc')
+                ->orderBy('created_at', 'desc')
                 ->get()
                 ->unique('song_id')
                 ->values();
@@ -185,5 +284,133 @@ class DashboardController extends Controller
         }
 
         return view('player', compact('currentSong', 'playlist', 'currentIndex'));
+    }
+
+    /**
+     * Show music player for a specific playlist
+     */
+    public function showPlaylistPlayer($playlistId, $songId = null)
+    {
+        $user = Auth::user();
+
+        // Get the playlist and ensure user owns it
+        $playlistModel = Playlist::where('id', $playlistId)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        // Get songs from this playlist
+        $playlist = UserSong::where('user_id', $user->id)
+            ->where('playlist_id', $playlistId)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        if ($songId) {
+            // Find the current song
+            $currentSong = $playlist->where('song_id', $songId)->first();
+
+            if (!$currentSong) {
+                // If song not in playlist, find it and ensure complete data
+                $currentSong = UserSong::where('song_id', $songId)
+                    ->where('user_id', $user->id)
+                    ->first();
+                if ($currentSong) {
+                    $this->ensureCompleteSongData($currentSong->song_id, $currentSong->url, $currentSong->title, $currentSong->artist, $currentSong->thumbnail);
+                    $currentSong = UserSong::where('song_id', $songId)
+                        ->where('user_id', $user->id)
+                        ->first();
+                }
+            }
+
+            $currentIndex = $playlist->search(function ($song) use ($songId) {
+                return $song->song_id === $songId;
+            });
+
+            if ($currentIndex === false) {
+                $currentIndex = 0;
+            }
+        } else {
+            $currentSong = $playlist->first();
+            $currentIndex = 0;
+        }
+
+        return view('player', compact('currentSong', 'playlist', 'currentIndex'));
+    }
+
+    /**
+     * Fetch thumbnail from yt-dlp for a given URL
+     */
+    private function fetchThumbnail($url)
+    {
+        try {
+            $command = [
+                'yt-dlp',
+                $url,
+                '--skip-download',
+                '--print-json',
+                '--no-warnings',
+                '--quiet',
+                '--socket-timeout',
+                '10'
+            ];
+
+            $process = \Illuminate\Support\Facades\Process::run($command);
+
+            if ($process->successful() || $process->exitCode() === 101) {
+                $output = trim($process->output());
+                $json = json_decode($output, true);
+
+                if ($json && isset($json['thumbnail'])) {
+                    return $json['thumbnail'];
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to fetch thumbnail for URL ' . $url . ': ' . $e->getMessage());
+        }
+
+        return null; // Return null instead of fallback
+    }
+
+    /**
+     * Fetch complete song data from yt-dlp for a given URL
+     */
+    private function fetchSongData($url)
+    {
+        try {
+            $command = [
+                'yt-dlp',
+                $url,
+                '--skip-download',
+                '--print-json',
+                '--no-warnings',
+                '--quiet',
+                '--socket-timeout',
+                '10'
+            ];
+
+            $process = \Illuminate\Support\Facades\Process::run($command);
+
+            if ($process->successful() || $process->exitCode() === 101) {
+                $output = trim($process->output());
+                $json = json_decode($output, true);
+
+                if ($json) {
+                    return [
+                        'title' => $json['title'] ?? null,
+                        'artist' => $json['uploader'] ?? $json['channel'] ?? null,
+                        'thumbnail' => $json['thumbnail'] ?? null,
+                        'duration' => $json['duration'] ?? null,
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to fetch song data for URL ' . $url . ': ' . $e->getMessage());
+        }
+
+        return [
+            'title' => null,
+            'artist' => null,
+            'thumbnail' => null,
+            'duration' => null,
+        ];
     }
 }

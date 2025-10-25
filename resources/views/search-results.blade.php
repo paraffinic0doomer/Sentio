@@ -97,6 +97,89 @@
             margin-bottom: 20px;
             display: block;
         }
+
+        .add-playlist-btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .add-playlist-btn:hover {
+            background: #555;
+        }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #2a2a2a;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            color: white;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: white;
+        }
+
+        .modal-content button {
+            background: #1db954;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .modal-content button:hover {
+            background: #1ed760;
+        }
     </style>
 </head>
 <body>
@@ -121,8 +204,9 @@
             <aside class="sidebar">
                 <ul>
                     <li><a href="{{ route('dashboard') }}"><i class="fas fa-home"></i> Home</a></li>
-                    <li><a href="#"><i class="fas fa-user"></i> Profile</a></li>
-                    <li><a href="#"><i class="fas fa-list"></i> Playlists</a></li>
+                    <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
+                    <li><a href="{{ route('playlists.index') }}"><i class="fas fa-list"></i> Playlists</a></li>
+                    <li><a href="{{ route('history') }}"><i class="fas fa-history"></i> History</a></li>
                     <li><a href="#"><i class="fas fa-smile"></i> Moods</a></li>
                     <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 </ul>
@@ -152,11 +236,14 @@
                                 <div class="result-info">
                                     <h4>{{ $song['title'] }}</h4>
                                     <p>{{ $song['artist'] }}</p>
-                                    <small>{{ number_format($song['views'] ?? 0) }} views • {{ formatDuration($song['duration'] ?? 0) }}</small>
+                                    <small>{{ number_format($song['views'] ?? 0) }} views • {{ $song['duration'] }}</small>
                                 </div>
                                 <div class="result-actions">
                                     <button class="play-btn" onclick="playSong('{{ $song['id'] }}', '{{ addslashes($song['title']) }}', '{{ addslashes($song['artist']) }}', '{{ $song['thumbnail'] }}', '{{ $song['url'] }}')">
                                         <i class="fas fa-play"></i> Play
+                                    </button>
+                                    <button class="add-playlist-btn" onclick="showPlaylistForm('{{ $song['id'] }}', '{{ addslashes($song['title']) }}', '{{ addslashes($song['artist']) }}', '{{ $song['url'] }}', '{{ $song['thumbnail'] }}')">
+                                        <i class="fas fa-plus"></i> Add
                                     </button>
                                 </div>
                             </div>
@@ -202,6 +289,115 @@
                 console.error('Error playing song:', error);
                 alert('Failed to play song. Please try again.');
             });
+    </script>
+
+    <!-- Playlist Modal -->
+    <div id="playlistModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closePlaylistModal()">&times;</span>
+            <h3>Add to Playlist</h3>
+            <form id="playlistForm">
+                <div class="form-group">
+                    <label for="playlistSelect">Select Playlist:</label>
+                    <select id="playlistSelect" name="playlist_id">
+                        <option value="">Select a playlist...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newPlaylistName">Or Create New Playlist:</label>
+                    <input type="text" id="newPlaylistName" name="name" placeholder="Enter playlist name">
+                </div>
+                <button type="button" onclick="addToPlaylist()">Add to Playlist</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentSongData = {};
+
+        function showPlaylistForm(songId, title, artist, url, thumbnail = '') {
+            currentSongData = { songId, title, artist, url, thumbnail };
+
+            fetch('/playlists/user')
+                .then(response => response.json())
+                .then(playlists => {
+                    const select = document.getElementById('playlistSelect');
+                    select.innerHTML = '<option value="">Select a playlist...</option>';
+
+                    playlists.forEach(playlist => {
+                        const option = document.createElement('option');
+                        option.value = playlist.id;
+                        option.textContent = `${playlist.name} (${playlist.songs_count} songs)`;
+                        select.appendChild(option);
+                    });
+
+                    document.getElementById('playlistModal').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error loading playlists:', error);
+                    alert('Failed to load playlists. Please try again.');
+                });
+        }
+
+        function addToPlaylist() {
+            const playlistId = document.getElementById('playlistSelect').value;
+            const newPlaylistName = document.getElementById('newPlaylistName').value.trim();
+
+            if (!playlistId && !newPlaylistName) {
+                alert('Please select a playlist or enter a new playlist name.');
+                return;
+            }
+
+            let requestData;
+            let endpoint;
+
+            if (playlistId) {
+                requestData = {
+                    song_id: currentSongData.songId,
+                    title: currentSongData.title,
+                    artist: currentSongData.artist,
+                    url: currentSongData.url,
+                    thumbnail: currentSongData.thumbnail
+                };
+                endpoint = `/playlists/${playlistId}/add-song`;
+            } else {
+                requestData = {
+                    name: newPlaylistName,
+                    song_id: currentSongData.songId,
+                    title: currentSongData.title,
+                    artist: currentSongData.artist,
+                    url: currentSongData.url,
+                    thumbnail: currentSongData.thumbnail
+                };
+                endpoint = '/playlists/create';
+            }
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    closePlaylistModal();
+                } else if (data.error) {
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error adding to playlist:', error);
+                alert('Failed to add song to playlist. Please try again.');
+            });
+        }
+
+        function closePlaylistModal() {
+            document.getElementById('playlistModal').style.display = 'none';
+            document.getElementById('playlistForm').reset();
         }
     </script>
 </body>

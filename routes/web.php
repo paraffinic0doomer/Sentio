@@ -30,11 +30,14 @@ Route::middleware(['auth'])->group(function () {
     
     // Music Player Route
     Route::get('/player/{songId?}', [DashboardController::class, 'showPlayer'])->name('player');
+    Route::get('/player/playlist/{playlistId}/{songId?}', [DashboardController::class, 'showPlaylistPlayer'])->name('player.playlist');
     
     // Playlist routes
     Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
     Route::get('/playlists/user', [PlaylistController::class, 'getUserPlaylists'])->name('playlists.user');
     Route::post('/playlists/create', [PlaylistController::class, 'createPlaylist'])->name('playlists.create');
+    Route::get('/playlists/{playlist}', [PlaylistController::class, 'showPlaylist'])->name('playlists.show');
+    Route::post('/playlists/{playlist}/add-song', [PlaylistController::class, 'addSongToPlaylist'])->name('playlists.add-song');
     Route::get('/playlists/{id}/songs', [PlaylistController::class, 'getSongs'])->name('playlists.songs');
     Route::delete('/songs/{id}', [PlaylistController::class, 'deleteSong'])->name('songs.delete');
 });

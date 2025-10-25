@@ -71,81 +71,30 @@
             font-size: 4rem;
             margin-bottom: 1rem;
         }
-    </style>
-</head>
-<body>
-    <div class="dashboard-layout">
-        <!-- Header -->
-        <header class="dashboard-header">
-            <div class="logo">Sentio</div>
-            <div class="search-container">
-                <form action="{{ route('search') }}" method="GET" class="search-form">
-                    <div class="search-box">
-                        <input type="text" name="q" placeholder="Search for songs...">
-                    </div>
-                    <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
-                </form>
-            </div>
-            <a href="{{ route('profile') }}" class="profile-avatar">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</a>
-        </header>
 
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <ul>
-                <li><a href="{{ route('dashboard') }}"><i class="fas fa-home"></i> Home</a></li>
-                <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
-                <li><a href="{{ route('playlists.index') }}" class="active"><i class="fas fa-list"></i> Playlists</a></li>
-                <li><a href="{{ route('history') }}"><i class="fas fa-history"></i> History</a></li>
-                <li><a href="#"><i class="fas fa-smile"></i> Moods</a></li>
-                <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            </ul>
-            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">@csrf</form>
-        </aside>
+        .create-playlist-btn {
+            background-color: #00d4ff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+            transition: background-color 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <div class="welcome-message">
-                <h3>My Playlists</h3>
-                <p>Organize and enjoy your favorite music collections</p>
-            </div>
+        .create-playlist-btn:hover {
+            background-color: #0099cc;
+        }
 
-            @if($playlists->count() > 0)
-                <div class="songs-grid">
-                    @foreach($playlists as $playlist)
-                        <div class="song-card" onclick="openPlaylist({{ $playlist->id }}, '{{ $playlist->name }}')">
-                            <div class="song-icon">🎵</div>
-                            <div class="song-info">
-                                <h5>{{ $playlist->name }}</h5>
-                                <p>{{ $playlist->songs->count() }} song{{ $playlist->songs->count() !== 1 ? 's' : '' }}</p>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @else
-                <div class="empty-state">
-                    <i class="fas fa-music"></i>
-                    <p>No playlists yet. Create one by adding songs from recommendations!</p>
-                </div>
-            @endif
-        </main>
-    </div>
+        .create-playlist-btn i {
+            margin-right: 0.5rem;
+        }
 
-    <!-- Playlist Songs Modal -->
-    <div id="songsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="playlistTitle">Playlist</h2>
-                <span class="close" onclick="closeModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <ul id="songsList" class="songs-list">
-                    <!-- Songs will be loaded here -->
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <style>
         .modal {
             display: none;
             position: fixed;
@@ -257,7 +206,164 @@
             color: #ff4757;
             background: rgba(255, 71, 87, 0.1);
         }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #334155;
+            border-radius: 5px;
+            background-color: #0f172a;
+            color: #ffffff;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .cancel-btn, .create-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        .cancel-btn {
+            background-color: #64748b;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background-color: #475569;
+        }
+
+        .create-btn {
+            background-color: #00d4ff;
+            color: white;
+        }
+
+        .create-btn:hover {
+            background-color: #0099cc;
+        }
     </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="logo">Sentio</div>
+            <div class="search-container">
+                <form action="{{ route('search') }}" method="GET" class="search-form">
+                    <div class="search-box">
+                        <input type="text" name="q" placeholder="Search for songs...">
+                    </div>
+                    <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
+                </form>
+            </div>
+            <a href="{{ route('profile') }}" class="profile-avatar">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</a>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <ul>
+                <li><a href="{{ route('dashboard') }}"><i class="fas fa-home"></i> Home</a></li>
+                <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="{{ route('playlists.index') }}" class="active"><i class="fas fa-list"></i> Playlists</a></li>
+                <li><a href="{{ route('history') }}"><i class="fas fa-history"></i> History</a></li>
+                <li><a href="#"><i class="fas fa-smile"></i> Moods</a></li>
+                <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            </ul>
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">@csrf</form>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="welcome-message">
+                <h3>My Playlists</h3>
+                <p>Organize and enjoy your favorite music collections</p>
+                <button onclick="showCreatePlaylistModal()" class="create-playlist-btn">
+                    <i class="fas fa-plus"></i> Create New Playlist
+                </button>
+            </div>
+
+            @if($playlists->count() > 0)
+                <div class="songs-grid">
+                    @foreach($playlists as $playlist)
+                        <div class="song-card" onclick="openPlaylist({{ $playlist->id }}, '{{ $playlist->name }}')">
+                            <div class="song-icon">🎵</div>
+                            <div class="song-info">
+                                <h5>{{ $playlist->name }}</h5>
+                                <p>{{ $playlist->songs->count() }} song{{ $playlist->songs->count() !== 1 ? 's' : '' }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="empty-state">
+                    <i class="fas fa-music"></i>
+                    <p>No playlists yet. Create one by adding songs from recommendations!</p>
+                </div>
+            @endif
+        </main>
+    </div>
+
+    <!-- Playlist Songs Modal -->
+    <div id="songsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="playlistTitle">Playlist</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <ul id="songsList" class="songs-list">
+                    <!-- Songs will be loaded here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Playlist Modal -->
+    <div id="createPlaylistModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Playlist</h2>
+                <span class="close" onclick="closeCreateModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="createPlaylistForm">
+                    <div class="form-group">
+                        <label for="playlistName">Playlist Name</label>
+                        <input type="text" id="playlistName" name="name" required placeholder="Enter playlist name">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closeCreateModal()" class="cancel-btn">Cancel</button>
+                        <button type="submit" class="create-btn">Create Playlist</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script>
         function openPlaylist(id, name) {
@@ -275,7 +381,7 @@
                             li.className = 'song-item';
                             li.innerHTML = `
                                 <div class="song-details">
-                                    <img src="${song.thumbnail || '/images/default-thumb.jpg'}" alt="Thumbnail" style="width: 50px; height: 50px; border-radius: 5px; margin-right: 1rem; object-fit: cover;">
+                                    <img src="${song.thumbnail || '/images/cats.jpg'}" alt="Thumbnail" style="width: 50px; height: 50px; border-radius: 5px; margin-right: 1rem; object-fit: cover;">
                                     <div>
                                         <h4>${song.title}</h4>
                                         <p>${song.artist}</p>
@@ -315,8 +421,54 @@
         }
 
         window.onclick = function (e) {
-            if (e.target == document.getElementById('songsModal')) closeModal();
+            const songsModal = document.getElementById('songsModal');
+            const createModal = document.getElementById('createPlaylistModal');
+            if (e.target == songsModal) closeModal();
+            if (e.target == createModal) closeCreateModal();
         }
+
+        function showCreatePlaylistModal() {
+            document.getElementById('createPlaylistModal').style.display = 'block';
+            document.getElementById('playlistName').focus();
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createPlaylistModal').style.display = 'none';
+            document.getElementById('createPlaylistForm').reset();
+        }
+
+        document.getElementById('createPlaylistForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('playlistName').value.trim();
+            
+            if (!name) {
+                alert('Please enter a playlist name');
+                return;
+            }
+
+            fetch('/playlists/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ name: name })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert(data.message);
+                    closeCreateModal();
+                    location.reload(); // Refresh to show new playlist
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error creating playlist');
+            });
+        });
     </script>
 </body>
 </html>

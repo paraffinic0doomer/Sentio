@@ -55,7 +55,7 @@
                     <div class="songs-grid">
                         @forelse($songs ?? [] as $song)
                             <div class="song-card">
-                                <img src="{{ $song->thumbnail ?? asset('images/default-thumb.jpg') }}" alt="Thumbnail" class="song-thumb">
+                                <img src="{{ $song->thumbnail ?? asset('images/cats.jpg') }}" alt="Thumbnail" class="song-thumb">
                                 <div class="song-info">
                                     <h5>{{ $song->title }}</h5>
                                     <p>{{ $song->artist }}</p>

@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Playlist extends Model
 {
-    protected $fillable = ['user_id', 'name'];
+    protected $fillable = ['user_id', 'name', 'description'];
 
     public function songs()
     {
-        return $this->hasMany(UserSong::class);
+        return $this->hasMany(UserSong::class, 'playlist_id');
     }
 
     public function user()

@@ -71,7 +71,7 @@ class InvidiousController extends Controller
                             'url' => 'https://www.youtube.com/watch?v=' . $json['id'],
                             'thumbnail' => $json['thumbnail'] ?? asset('images/cats.jpg'),
                             'views' => $json['view_count'] ?? 0,
-                            'duration' => $json['duration'] ?? 0,
+                            'duration' => $this->formatDuration($json['duration'] ?? 0),
                         ];
                     }
                 }
@@ -86,5 +86,15 @@ class InvidiousController extends Controller
         }
 
         return collect();
+    }
+
+    /**
+     * Format duration from seconds to MM:SS format
+     */
+    private function formatDuration($seconds)
+    {
+        $mins = floor($seconds / 60);
+        $secs = $seconds % 60;
+        return sprintf('%d:%02d', $mins, $secs);
     }
 }
