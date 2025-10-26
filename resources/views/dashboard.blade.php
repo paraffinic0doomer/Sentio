@@ -104,10 +104,19 @@
 
         // Track page visibility to detect navigation vs refresh
         let hasNavigatedAway = false;
+        let pageLoadTime = Date.now();
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if user navigated back (not refreshed)
-            if (sessionStorage.getItem('hasNavigatedAway') === 'true') {
+            // Only load cached recommendations if this is a page refresh (not navigation back)
+            // We can detect this by checking if the page loaded very quickly (from cache)
+            let timeSinceNavigation = Date.now() - pageLoadTime;
+            let wasNavigatedBack = sessionStorage.getItem('hasNavigatedAway') === 'true';
+
+            if (wasNavigatedBack && timeSinceNavigation < 1000) {
+                // This was a navigation back, don't load cached recommendations
+                sessionStorage.removeItem('hasNavigatedAway');
+            } else if (wasNavigatedBack) {
+                // This might be a refresh, load cached recommendations
                 loadCachedRecommendations();
                 sessionStorage.removeItem('hasNavigatedAway');
             }

@@ -33,7 +33,7 @@
                     <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
                     <li><a href="{{ route('playlists.index') }}"><i class="fas fa-list"></i> Playlists</a></li>
                     <li><a href="{{ route('history') }}" class="active"><i class="fas fa-history"></i> History</a></li>
-                    <li><a href="{{ route('explore') }}"><i class="fas fa-smile"></i> Explore</a></li>
+                    <li><a href="{{ route('explore') }}"><i class="fas fa-compass"></i> Explore</a></li>
                     <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 </ul>
                 <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">

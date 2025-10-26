@@ -5,6 +5,8 @@ namespace App\Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use App\Models\Mood;
+use Illuminate\Support\Facades\Auth;
 
 class LlmService
 {
@@ -70,7 +72,7 @@ class LlmService
                 '--quiet'
             ];
 
-            $process = Process::timeout(30)->run($command);
+            $process = Process::timeout(300)->run($command);
 
             if ($process->successful()) {
                 $output = trim($process->output());
@@ -176,6 +178,87 @@ class LlmService
     {
         return $this->fetchMultipleSongMetadata($songs);
     }
+
+    /**
+     * Get explore recommendations based on user's mood history from database
+     */
+    public function getExploreRecommendations($limit = 10, $offset = 0)
+    {
+        Log::info("LlmService::getExploreRecommendations called with limit: {$limit}, offset: {$offset}");
+        $user = Auth::user();
+        
+        Log::info("getExploreRecommendations called for user {$user->id}, limit: {$limit}, offset: {$offset}");
+
+        // Step 1: Fetch moods from database (last 7 days)
+        $recentMoods = Mood::where('user_id', $user->id)
+            ->where('date', '>=', now()->subDays(7)->toDateString())
+            ->orderBy('date', 'desc')
+            ->get();
+
+        // If no moods in last 7 days, check for any mood history at all
+        if ($recentMoods->isEmpty()) {
+            $recentMoods = Mood::where('user_id', $user->id)
+                ->orderBy('date', 'desc')
+                ->get();
+        }
+
+        if ($recentMoods->isEmpty()) {
+            Log::warning("No mood history found for user {$user->id}");
+            return [];
+        }
+
+        // Collect all unique moods from the history (handling comma-separated values)
+        $allMoods = collect();
+        foreach ($recentMoods as $moodRecord) {
+            $moods = explode(', ', $moodRecord->mood);
+            foreach ($moods as $mood) {
+                $allMoods->push(trim($mood));
+            }
+        }
+        $allMoods = $allMoods->unique()->values();
+
+        // Combine all moods into a single query string
+        $combinedMood = $allMoods->implode(', ');
+        Log::info("Combined mood history for user {$user->id}: '{$combinedMood}'");
+
+        // Check cache for song suggestions
+        $cacheKey = 'explore_songs_' . $user->id . '_' . md5($combinedMood);
+        $cachedSongs = session($cacheKey);
+
+        if (!$cachedSongs) {
+            // Step 2: Send combined mood to Groq to get song recommendations
+            $songsToRequest = 100; // Always get a large pool for explore
+            $songSuggestions = $this->getRecommendationFromGroq($combinedMood, $songsToRequest);
+
+            if (!$songSuggestions || empty($songSuggestions)) {
+                Log::error("No song suggestions returned from Groq for user {$user->id} with mood: {$combinedMood}");
+                return [];
+            }
+
+            Log::info("Got " . count($songSuggestions) . " song suggestions from Groq for explore");
+            
+            // Cache the song suggestions
+            session([$cacheKey => $songSuggestions]);
+            $cachedSongs = $songSuggestions;
+        } else {
+            Log::info("Using cached song suggestions for user {$user->id} - " . count($cachedSongs) . " songs available");
+        }
+
+        // Step 3: Apply offset and limit for pagination
+        $paginatedSongs = array_slice($cachedSongs, $offset, $limit);
+
+        // Step 4: Fetch metadata from yt-dlp for the paginated songs
+        $recommendations = $this->fetchMultipleSongMetadata($paginatedSongs);
+
+        Log::info("Generated " . count($recommendations) . " explore recommendations with metadata for user {$user->id}");
+
+        // Return both recommendations and total count for pagination
+        return [
+            'recommendations' => $recommendations,
+            'total' => count($cachedSongs),
+            'hasMore' => ($offset + $limit) < count($cachedSongs)
+        ];
+    }
     private function fetchMultipleSongMetadata($songs)
     {
         $recommendations = [];
@@ -194,7 +277,7 @@ class LlmService
                 '--quiet'
             ];
 
-            $process = Process::timeout(30)->run($command);
+            $process = Process::timeout(300)->run($command);
             
             if ($process->successful()) {
                 $output = trim($process->output());

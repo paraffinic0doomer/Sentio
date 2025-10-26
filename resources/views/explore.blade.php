@@ -61,7 +61,17 @@
                             @foreach($recentMoods->groupBy('date')->sortKeysDesc() as $date => $moods)
                                 <div class="mood-day">
                                     <span class="date">{{ \Carbon\Carbon::parse($date)->format('M j') }}</span>
-                                    <span class="mood">{{ $moods->first()->mood }}</span>
+                                    @php
+                                        $allMoodsForDay = [];
+                                        foreach($moods as $moodRecord) {
+                                            $moodStrings = explode(', ', $moodRecord->mood);
+                                            $allMoodsForDay = array_merge($allMoodsForDay, $moodStrings);
+                                        }
+                                        $uniqueMoodsForDay = array_unique($allMoodsForDay);
+                                    @endphp
+                                    @foreach($uniqueMoodsForDay as $mood)
+                                        <span class="mood">{{ $mood }}</span>
+                                    @endforeach
                                 </div>
                             @endforeach
                         </div>
@@ -120,7 +130,7 @@
     </div>
 
     <script>
-        console.log('Explore page script loaded');
+        console.log('Explore page script loaded - PAGE LOADED SUCCESSFULLY');
         let currentSongData = null;
         let currentOffset = 0;
         const initialLoad = 10;

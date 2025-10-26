@@ -89,13 +89,25 @@ class DashboardController extends Controller
 
         // Track user's mood for the last 7 days
         if ($feeling) {
-            Mood::updateOrCreate(
-                [
+            $existingMood = Mood::where('user_id', Auth::id())
+                ->where('date', now()->toDateString())
+                ->first();
+
+            if ($existingMood) {
+                // Append new mood to existing moods for today
+                $currentMoods = explode(', ', $existingMood->mood);
+                if (!in_array($feeling, $currentMoods)) {
+                    $currentMoods[] = $feeling;
+                    $existingMood->update(['mood' => implode(', ', $currentMoods)]);
+                }
+            } else {
+                // Create new mood entry for today
+                Mood::create([
                     'user_id' => Auth::id(),
+                    'mood' => $feeling,
                     'date' => now()->toDateString(),
-                ],
-                ['mood' => $feeling]
-            );
+                ]);
+            }
         }
 
         // Store in session for persistence across page loads
@@ -174,17 +186,22 @@ class DashboardController extends Controller
         $offset = $request->input('offset', 0);
         $limit = $request->input('limit', 10);
 
-        // Get user's mood history from the last 7 days
+        Log::info("getExploreRecommendations called - User: {$user->id}, Offset: {$offset}, Limit: {$limit}");
+
+        // Get all moods from the last 7 days (can be comma-separated)
         $recentMoods = Mood::where('user_id', $user->id)
             ->where('date', '>=', now()->subDays(7)->toDateString())
             ->orderBy('date', 'desc')
             ->get();
+
+        Log::info("Found " . $recentMoods->count() . " mood records for user {$user->id}");
 
         // If no moods in last 7 days, check for any mood history at all
         if ($recentMoods->isEmpty()) {
             $recentMoods = Mood::where('user_id', $user->id)
                 ->orderBy('date', 'desc')
                 ->get();
+            Log::info("No recent moods, found " . $recentMoods->count() . " total mood records");
         }
 
         if ($recentMoods->isEmpty()) {
@@ -194,42 +211,59 @@ class DashboardController extends Controller
             ]);
         }
 
-        // Get the most common mood from the last 7 days
-        $moodCounts = $recentMoods->groupBy('mood')->map->count()->sortDesc();
-        $primaryMood = $moodCounts->keys()->first();
+        // Collect all unique moods from the last 7 days (handling comma-separated values)
+        $allMoods = collect();
+        foreach ($recentMoods as $moodRecord) {
+            $moods = explode(', ', $moodRecord->mood);
+            foreach ($moods as $mood) {
+                $allMoods->push(trim($mood));
+            }
+        }
+        $allMoods = $allMoods->unique()->values();
 
-        // Check if we have cached songs for this mood, or if we need to fetch new ones
-        $cacheKey = 'explore_songs_' . $user->id . '_' . $primaryMood;
+        // Combine all moods into a single query string for better recommendations
+        $combinedMood = $allMoods->implode(', ');
+        Log::info("Combined mood for user {$user->id}: '{$combinedMood}'");
+
+        // Check if we have cached songs for this mood combination, or if we need to fetch new ones
+        $cacheKey = 'explore_songs_' . $user->id . '_' . md5($combinedMood);
         $cachedSongs = session($cacheKey);
 
         if (!$cachedSongs || $offset === 0) {
+            Log::info("Fetching new songs for user {$user->id} with mood: {$combinedMood}");
             // Fetch 100 songs from Groq for the first request or if cache is empty
-            $allSongs = $this->llm->getAllSongSuggestions($primaryMood, 100);
+            $allSongs = $this->llm->getAllSongSuggestions($combinedMood, 100);
             
             if (!$allSongs || empty($allSongs)) {
+                Log::error("Failed to get song suggestions from Groq for user {$user->id}");
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Failed to generate recommendations. Please try again.',
                 ]);
             }
 
+            Log::info("Got " . count($allSongs) . " song suggestions from Groq");
             // Cache the songs in session
             session([$cacheKey => $allSongs]);
             $cachedSongs = $allSongs;
+        } else {
+            Log::info("Using cached songs for user {$user->id} - " . count($cachedSongs) . " songs available");
         }
 
         // Get the current batch of songs
         $batchSongs = array_slice($cachedSongs, $offset, $limit);
+        Log::info("Processing batch: offset {$offset}, limit {$limit}, " . count($batchSongs) . " songs");
 
         // Fetch metadata for this batch
         $recommendations = $this->llm->fetchBatchMetadata($batchSongs);
+        Log::info("Fetched " . count($recommendations) . " recommendations with metadata");
 
         // Check if there are more songs available
         $hasMore = ($offset + $limit) < count($cachedSongs);
 
         return response()->json([
             'status' => 'success',
-            'mood' => $primaryMood,
+            'mood' => $combinedMood,
             'recommendations' => $recommendations,
             'hasMore' => $hasMore,
         ]);
