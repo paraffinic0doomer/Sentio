@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use App\Services\LlmService;
 use App\Models\UserSong;
 use App\Models\Playlist;
+use App\Models\Mood;
 
 class DashboardController extends Controller
 {
@@ -86,6 +87,17 @@ class DashboardController extends Controller
         // Generate new recommendations
         $recommendations = $this->llm->getRecommendations($feeling);
 
+        // Track user's mood for the last 7 days
+        if ($feeling) {
+            Mood::updateOrCreate(
+                [
+                    'user_id' => Auth::id(),
+                    'date' => now()->toDateString(),
+                ],
+                ['mood' => $feeling]
+            );
+        }
+
         // Store in session for persistence across page loads
         session([
             'recommendations' => $recommendations,
@@ -110,6 +122,116 @@ class DashboardController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Recommendations cleared',
+        ]);
+    }
+
+    /**
+     * Display the explore page with mood-based recommendations
+     */
+    public function explore()
+    {
+        $user = Auth::user();
+
+        // Get user's mood history from the last 7 days
+        $recentMoods = Mood::where('user_id', $user->id)
+            ->where('date', '>=', now()->subDays(7)->toDateString())
+            ->orderBy('date', 'desc')
+            ->get();
+
+        // If no moods in last 7 days, check for any mood history at all
+        if ($recentMoods->isEmpty()) {
+            $recentMoods = Mood::where('user_id', $user->id)
+                ->orderBy('date', 'desc')
+                ->get();
+        }
+
+        // If no mood history at all, show page with message to get recommendations first
+        if ($recentMoods->isEmpty()) {
+            return view('explore', [
+                'recentMoods' => collect(),
+                'primaryMood' => null,
+                'hasMoodHistory' => false
+            ]);
+        }
+
+        // Get the most common mood from available mood history
+        $moodCounts = $recentMoods->groupBy('mood')->map->count()->sortDesc();
+        $primaryMood = $moodCounts->keys()->first();
+
+        return view('explore', [
+            'recentMoods' => $recentMoods,
+            'primaryMood' => $primaryMood,
+            'hasMoodHistory' => true
+        ]);
+    }
+
+    /**
+     * Get explore recommendations based on mood history
+     */
+    public function getExploreRecommendations(Request $request)
+    {
+        $user = Auth::user();
+        $offset = $request->input('offset', 0);
+        $limit = $request->input('limit', 10);
+
+        // Get user's mood history from the last 7 days
+        $recentMoods = Mood::where('user_id', $user->id)
+            ->where('date', '>=', now()->subDays(7)->toDateString())
+            ->orderBy('date', 'desc')
+            ->get();
+
+        // If no moods in last 7 days, check for any mood history at all
+        if ($recentMoods->isEmpty()) {
+            $recentMoods = Mood::where('user_id', $user->id)
+                ->orderBy('date', 'desc')
+                ->get();
+        }
+
+        if ($recentMoods->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No mood history found. Please get recommendations first.',
+            ]);
+        }
+
+        // Get the most common mood from the last 7 days
+        $moodCounts = $recentMoods->groupBy('mood')->map->count()->sortDesc();
+        $primaryMood = $moodCounts->keys()->first();
+
+        // Check if we have cached songs for this mood, or if we need to fetch new ones
+        $cacheKey = 'explore_songs_' . $user->id . '_' . $primaryMood;
+        $cachedSongs = session($cacheKey);
+
+        if (!$cachedSongs || $offset === 0) {
+            // Fetch 100 songs from Groq for the first request or if cache is empty
+            $allSongs = $this->llm->getAllSongSuggestions($primaryMood, 100);
+            
+            if (!$allSongs || empty($allSongs)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to generate recommendations. Please try again.',
+                ]);
+            }
+
+            // Cache the songs in session
+            session([$cacheKey => $allSongs]);
+            $cachedSongs = $allSongs;
+        }
+
+        // Get the current batch of songs
+        $batchSongs = array_slice($cachedSongs, $offset, $limit);
+
+        // Fetch metadata for this batch
+        $recommendations = $this->llm->fetchBatchMetadata($batchSongs);
+
+        // Check if there are more songs available
+        $hasMore = ($offset + $limit) < count($cachedSongs);
+
+        return response()->json([
+            'status' => 'success',
+            'mood' => $primaryMood,
+            'recommendations' => $recommendations,
+            'hasMore' => $hasMore,
         ]);
     }
 

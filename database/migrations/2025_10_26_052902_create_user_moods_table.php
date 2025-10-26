@@ -11,9 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('playlist_songs', function (Blueprint $table) {
+        Schema::create('user_moods', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('mood');
+            $table->date('date');
             $table->timestamps();
+
+            $table->unique(['user_id', 'date']); // One mood per user per day
         });
     }
 
@@ -22,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('playlist_songs');
+        Schema::dropIfExists('user_moods');
     }
 };

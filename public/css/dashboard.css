@@ -1266,3 +1266,100 @@ html, body {
         background: linear-gradient(45deg, #00ff99, #00d4ff);
         box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
     }
+
+/* ===== Explore Page Styles ===== */
+.mood-history {
+    background: rgba(10, 15, 26, 0.8);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.mood-history h4 {
+    color: #00d4ff;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.mood-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.mood-day {
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.mood-day .date {
+    color: #00d4ff;
+    font-weight: 600;
+}
+
+.mood-day .mood {
+    color: #e5e7eb;
+    text-transform: capitalize;
+}
+
+.explore-section {
+    margin-top: 2rem;
+}
+
+.explore-section h4 {
+    color: #00d4ff;
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+}
+
+#explore-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+#load-more-container {
+    margin-top: 2rem;
+}
+
+#load-more-btn {
+    background: linear-gradient(45deg, #00d4ff, #8e2de2);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+
+#load-more-btn:hover:not(:disabled) {
+    background: linear-gradient(45deg, #00ff99, #00d4ff);
+    box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+#load-more-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#loading-spinner {
+    color: #00d4ff;
+    font-size: 1.2rem;
+}
+
+#loading-spinner i {
+    margin-right: 0.5rem;
+}

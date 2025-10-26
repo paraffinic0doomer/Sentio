@@ -28,6 +28,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/get-recommendations', [DashboardController::class, 'getRecommendations'])->name('get.recommendations');
     Route::post('/clear-recommendations', [DashboardController::class, 'clearRecommendations'])->name('clear.recommendations');
     Route::get('/profile', [DashboardController::class, 'showProfile'])->name('profile');
+    Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/change-password', [ProfileController::class, 'changePassword'])->name('profile.change-password');
+    Route::post('/profile/update-preferences', [ProfileController::class, 'updatePreferences'])->name('profile.update-preferences');
+    Route::get('/explore', [DashboardController::class, 'explore'])->name('explore');
+    Route::post('/get-explore-recommendations', [DashboardController::class, 'getExploreRecommendations'])->name('get.explore.recommendations');
     
     // Music Player Route
     Route::get('/player/{songId?}', [DashboardController::class, 'showPlayer'])->name('player');
