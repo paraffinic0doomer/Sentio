@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\InvidiousController;
 use App\Http\Controllers\PlaylistController;
 
-Route::get('/search', [InvidiousController::class, 'search'])->name('search');
-
-
 Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
@@ -18,6 +15,8 @@ Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('l
 require __DIR__.'/auth.php';
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/search', [InvidiousController::class, 'search'])->name('search');
+    
     Route::post('/add-to-playlist', [PlaylistController::class, 'addSong'])->name('playlists.addSong');
     
     Route::get('/stream-audio/{songId}', [DashboardController::class, 'streamAudio'])->name('stream.audio');
@@ -31,6 +30,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword'])->name('profile.change-password');
     Route::post('/profile/update-preferences', [ProfileController::class, 'updatePreferences'])->name('profile.update-preferences');
+    Route::post('/songs/rate', [DashboardController::class, 'rateSong'])->name('songs.rate');
     Route::get('/explore', [DashboardController::class, 'explore'])->name('explore');
     Route::post('/get-explore-recommendations', [DashboardController::class, 'getExploreRecommendations'])->name('get.explore.recommendations');
     

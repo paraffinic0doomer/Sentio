@@ -207,7 +207,7 @@
                     <li><a href="{{ route('profile') }}"><i class="fas fa-user"></i> Profile</a></li>
                     <li><a href="{{ route('playlists.index') }}"><i class="fas fa-list"></i> Playlists</a></li>
                     <li><a href="{{ route('history') }}"><i class="fas fa-history"></i> History</a></li>
-                    <li><a href="#"><i class="fas fa-smile"></i> Moods</a></li>
+                    <li><a href="{{ route('explore') }}"><i class="fas fa-smile"></i> Explore</a></li>
                     <li><a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 </ul>
                 <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
@@ -277,10 +277,16 @@
                     url: url
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'success') {
-                    window.location.href = `/player/${songId}`;
+                    alert('Redirecting to player...');
+                    window.location.assign(`/player/${songId}`);
                 } else {
                     alert('Failed to play song. Please try again.');
                 }

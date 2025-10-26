@@ -88,6 +88,38 @@
             margin-bottom: 0;
         }
 
+        .rating-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .rating-stars {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .rating-stars i {
+            font-size: 1.5rem;
+            color: #b0b3b8;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .rating-stars i:hover,
+        .rating-stars i.active {
+            color: #ffd700;
+            transform: scale(1.2);
+        }
+
+        .rating-text {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            font-weight: 500;
+        }
+
         .player-controls {
             display: flex;
             flex-direction: column;
@@ -187,6 +219,40 @@
             width: 70%;
         }
 
+        .additional-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .timestamp-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .timestamp-input {
+            width: 60px;
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .timestamp-input::placeholder {
+            color: #b0b3b8;
+        }
+
+        .timestamp-input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.3);
+        }
+
         .playlist-section {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 15px;
@@ -269,6 +335,106 @@
                 width: 70px;
                 height: 70px;
             }
+
+            .additional-controls {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .timestamp-controls {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 0;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #00d4ff;
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #b0b3b8;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .playlist-option {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .playlist-option:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .playlist-option i {
+            margin-right: 1rem;
+            color: #00d4ff;
+        }
+
+        .playlist-option span {
+            color: #ffffff;
+            font-weight: 500;
         }
     </style>
 </head>
@@ -295,6 +461,18 @@
                     <div class="track-info">
                         <h1 id="trackTitle">{{ $currentSong->title }}</h1>
                         <p id="trackArtist">{{ $currentSong->artist }}</p>
+                    </div>
+
+                    <!-- Rating System -->
+                    <div class="rating-container">
+                        <div class="rating-stars" id="ratingStars">
+                            <i class="far fa-star" data-rating="1"></i>
+                            <i class="far fa-star" data-rating="2"></i>
+                            <i class="far fa-star" data-rating="3"></i>
+                            <i class="far fa-star" data-rating="4"></i>
+                            <i class="far fa-star" data-rating="5"></i>
+                        </div>
+                        <span class="rating-text" id="ratingText">Rate this song</span>
                     </div>
                 @else
                     <div class="album-art" style="background: linear-gradient(45deg, #8b5cf6, #ec4899); display: flex; align-items: center; justify-content: center;">
@@ -335,6 +513,19 @@
                         <div class="volume-fill" id="volumeFill"></div>
                     </div>
                 </div>
+
+                <!-- Additional Controls -->
+                <div class="additional-controls">
+                    <button class="control-btn" id="addToPlaylistBtn" title="Add to Playlist">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <div class="timestamp-controls">
+                        <input type="text" id="timestampInput" placeholder="0:00" class="timestamp-input">
+                        <button class="control-btn" id="seekToTimestampBtn" title="Seek to Time">
+                            <i class="fas fa-clock"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Playlist -->
@@ -361,6 +552,26 @@
         </main>
     </div>
 
+    <!-- Playlist Selection Modal -->
+    <div id="playlistModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add to Playlist</h3>
+                <button class="modal-close" onclick="closeModal('playlistModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="playlistList">
+                    <!-- Playlists will be loaded here -->
+                </div>
+                <button class="btn btn-secondary" onclick="createNewPlaylist()" style="margin-top: 1rem;">
+                    <i class="fas fa-plus"></i> Create New Playlist
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Audio Element -->
     <audio id="audioPlayer" preload="metadata"></audio>
 
@@ -368,6 +579,7 @@
         let currentSongId = '{{ $currentSong ? $currentSong->song_id : "" }}';
         let playlist = @json($playlist ?? []);
         let currentIndex = {{ $currentIndex ?? 0 }};
+        let currentRating = {{ $currentSong ? $currentSong->rating ?? 0 : 0 }};
 
         const audioPlayer = document.getElementById('audioPlayer');
         const playPauseBtn = document.getElementById('playPauseBtn');
@@ -379,11 +591,16 @@
         const volumeBar = document.getElementById('volumeBar');
         const volumeFill = document.getElementById('volumeFill');
         const albumArt = document.getElementById('albumArt');
+        const ratingStars = document.getElementById('ratingStars');
+        const ratingText = document.getElementById('ratingText');
 
         // Initialize player
         if (currentSongId) {
             loadSong(currentSongId);
         }
+
+        // Initialize rating display
+        updateRatingDisplay(currentRating);
 
         // Play/Pause
         playPauseBtn.addEventListener('click', togglePlayPause);
@@ -393,6 +610,22 @@
 
         // Volume control
         volumeBar.addEventListener('click', setVolume);
+
+        // Rating system
+        if (ratingStars) {
+            ratingStars.addEventListener('click', handleRating);
+        }
+
+        // Add to playlist button
+        document.getElementById('addToPlaylistBtn').addEventListener('click', openPlaylistModal);
+
+        // Timestamp controls
+        document.getElementById('seekToTimestampBtn').addEventListener('click', seekToTimestamp);
+        document.getElementById('timestampInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                seekToTimestamp();
+            }
+        });
 
         // Previous/Next
         document.getElementById('prevBtn').addEventListener('click', playPrevious);
@@ -415,6 +648,9 @@
                 if (albumArt) {
                     albumArt.src = song.thumbnail || '/images/cats.jpg';
                 }
+                // Update rating display
+                currentRating = song.rating || 0;
+                updateRatingDisplay(currentRating);
                 updatePlaylistUI(songId);
             }
 
@@ -464,6 +700,11 @@
             setTimeout(() => audioPlayer.play(), 500); // Small delay to ensure loading
             playPauseIcon.className = 'fas fa-pause';
             if (albumArt) albumArt.classList.add('playing');
+
+            // Update current rating for the new song
+            const song = playlist.find(s => s.song_id === songId);
+            currentRating = song ? (song.rating || 0) : 0;
+            updateRatingDisplay(currentRating);
         }
 
         function playPrevious() {
@@ -515,6 +756,220 @@
             const secs = Math.floor(seconds % 60);
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
+
+        function handleRating(e) {
+            if (e.target.tagName === 'I') {
+                const rating = parseInt(e.target.getAttribute('data-rating'));
+                rateSong(rating);
+            }
+        }
+
+        function rateSong(rating) {
+            if (!currentSongId) return;
+
+            fetch('/songs/rate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    song_id: currentSongId,
+                    rating: rating
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentRating = rating;
+                    updateRatingDisplay(rating);
+
+                    // Update the rating in the playlist array
+                    const songIndex = playlist.findIndex(s => s.song_id === currentSongId);
+                    if (songIndex !== -1) {
+                        playlist[songIndex].rating = rating;
+                    }
+                } else {
+                    console.error('Failed to save rating:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error rating song:', error);
+            });
+        }
+
+        function updateRatingDisplay(rating) {
+            if (!ratingStars) return;
+
+            const stars = ratingStars.querySelectorAll('i');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.className = 'fas fa-star active';
+                } else {
+                    star.className = 'far fa-star';
+                }
+            });
+
+            if (ratingText) {
+                if (rating > 0) {
+                    ratingText.textContent = `${rating} star${rating > 1 ? 's' : ''}`;
+                } else {
+                    ratingText.textContent = 'Rate this song';
+                }
+            }
+        }
+
+        function openPlaylistModal() {
+            if (!currentSongId) {
+                alert('No song is currently playing');
+                return;
+            }
+
+            // Load user's playlists
+            fetch('/playlists/user')
+                .then(response => response.json())
+                .then(data => {
+                    const playlistList = document.getElementById('playlistList');
+                    playlistList.innerHTML = '';
+
+                    if (data.length === 0) {
+                        playlistList.innerHTML = '<p style="color: #b0b3b8; text-align: center;">No playlists found. Create one first!</p>';
+                    } else {
+                        data.forEach(playlist => {
+                            const option = document.createElement('div');
+                            option.className = 'playlist-option';
+                            option.onclick = () => addToPlaylist(playlist.id, playlist.name);
+                            option.innerHTML = `
+                                <i class="fas fa-list"></i>
+                                <span>${playlist.name}</span>
+                            `;
+                            playlistList.appendChild(option);
+                        });
+                    }
+
+                    openModal('playlistModal');
+                })
+                .catch(error => {
+                    console.error('Error loading playlists:', error);
+                    alert('Error loading playlists. Please try again.');
+                });
+        }
+
+        function addToPlaylist(playlistId, playlistName) {
+            if (!currentSongId) return;
+
+            const song = playlist.find(s => s.song_id === currentSongId);
+            if (!song) return;
+
+            fetch(`/playlists/${playlistId}/add-song`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    song_id: currentSongId,
+                    title: song.title,
+                    artist: song.artist,
+                    thumbnail: song.thumbnail,
+                    url: song.url
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Song added to "${playlistName}" successfully!`);
+                    closeModal('playlistModal');
+                } else {
+                    alert('Error adding song to playlist: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error adding to playlist:', error);
+                alert('Error adding song to playlist. Please try again.');
+            });
+        }
+
+        function createNewPlaylist() {
+            const playlistName = prompt('Enter playlist name:');
+            if (!playlistName || playlistName.trim() === '') return;
+
+            fetch('/playlists/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    name: playlistName.trim()
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Playlist "${playlistName}" created successfully!`);
+                    // Refresh the playlist modal
+                    openPlaylistModal();
+                } else {
+                    alert('Error creating playlist: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error creating playlist:', error);
+                alert('Error creating playlist. Please try again.');
+            });
+        }
+
+        function seekToTimestamp() {
+            const input = document.getElementById('timestampInput');
+            const timeString = input.value.trim();
+
+            if (!timeString) return;
+
+            const seconds = parseTimestamp(timeString);
+            if (seconds !== null && audioPlayer.duration) {
+                audioPlayer.currentTime = Math.min(seconds, audioPlayer.duration);
+                input.value = ''; // Clear input after seeking
+            } else {
+                alert('Invalid timestamp format. Use MM:SS or M:SS');
+            }
+        }
+
+        function parseTimestamp(timeString) {
+            // Support formats like "1:30", "01:30", "90" (seconds)
+            const parts = timeString.split(':');
+
+            if (parts.length === 1) {
+                // Just seconds
+                const seconds = parseInt(parts[0]);
+                return isNaN(seconds) ? null : seconds;
+            } else if (parts.length === 2) {
+                // MM:SS format
+                const minutes = parseInt(parts[0]);
+                const seconds = parseInt(parts[1]);
+                if (isNaN(minutes) || isNaN(seconds) || seconds >= 60) {
+                    return null;
+                }
+                return minutes * 60 + seconds;
+            }
+
+            return null;
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('show');
+            }
+        });
 
         function goBack() {
             // Scroll to bottom of dashboard page

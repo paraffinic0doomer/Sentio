@@ -383,6 +383,21 @@ class DashboardController extends Controller
             ->where('user_id', Auth::id())
             ->first();
 
+        if (!$song) {
+            abort(404, 'Song not found');
+        }
+
+        // If audio doesn't exist, try to extract it
+        if (!$song->audio_url || !file_exists(storage_path('app/audio/' . basename($song->audio_url)))) {
+            if ($song->url) {
+                $this->extractAudio($song->url, $songId);
+                // Refresh song data
+                $song = UserSong::where('song_id', $songId)
+                    ->where('user_id', Auth::id())
+                    ->first();
+            }
+        }
+
         if (!$song || !$song->audio_url) {
             abort(404, 'Audio file not found');
         }
@@ -404,6 +419,8 @@ class DashboardController extends Controller
      */
     public function showPlayer($songId = null)
     {
+        \Log::info('showPlayer called with songId:', [$songId]);
+        
         $user = Auth::user();
 
         if ($songId) {
@@ -580,5 +597,92 @@ class DashboardController extends Controller
             'thumbnail' => null,
             'duration' => null,
         ];
+    }
+
+    /**
+     * Extract audio from YouTube URL using yt-dlp
+     */
+    private function extractAudio($url, $songId)
+    {
+        try {
+            // Create audio directory if it doesn't exist
+            $audioDir = storage_path('app/audio');
+            if (!file_exists($audioDir)) {
+                mkdir($audioDir, 0755, true);
+            }
+
+            // Generate filename
+            $filename = $songId . '.mp3';
+            $audioPath = $audioDir . '/' . $filename;
+
+            // Skip if audio already exists
+            if (file_exists($audioPath)) {
+                return '/audio/' . $filename;
+            }
+
+            // Extract audio using yt-dlp
+            $command = [
+                'yt-dlp',
+                '--extract-audio',
+                '--audio-format', 'mp3',
+                '--audio-quality', '128K',
+                '--output', $audioPath,
+                '--no-playlist',
+                '--socket-timeout', '30',
+                '--cache-dir', storage_path('app/yt-dlp-cache'),
+                '--quiet',
+                $url
+            ];
+
+            $process = \Illuminate\Support\Facades\Process::run($command);
+
+            if ($process->successful()) {
+                // Update the song record with audio URL and extraction timestamp
+                UserSong::where('song_id', $songId)
+                    ->where('user_id', Auth::id())
+                    ->update([
+                        'audio_url' => '/audio/' . $filename,
+                        'audio_extracted_at' => now(),
+                    ]);
+
+                return '/audio/' . $filename;
+            } else {
+                \Illuminate\Support\Facades\Log::error('Audio extraction failed for URL ' . $url . ': ' . $process->errorOutput());
+                return null;
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Audio extraction error for URL ' . $url . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Rate a song
+     */
+    public function rateSong(Request $request)
+    {
+        $request->validate([
+            'song_id' => 'required|string',
+            'rating' => 'required|integer|min:1|max:5',
+        ]);
+
+        $song = UserSong::where('song_id', $request->song_id)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$song) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Song not found'
+            ], 404);
+        }
+
+        $song->update(['rating' => $request->rating]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Rating saved successfully',
+            'rating' => $request->rating
+        ]);
     }
 }

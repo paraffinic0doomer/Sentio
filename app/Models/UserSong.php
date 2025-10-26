@@ -20,6 +20,7 @@ class UserSong extends Model
         'audio_url',
         'audio_extracted_at',
         'url',
+        'rating',
     ];
 
     public $timestamps = true;
