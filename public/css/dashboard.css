@@ -223,7 +223,7 @@ html, body {
 /* ===== Songs Grid ===== */
 .songs-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1.5rem;
 }
 
@@ -231,7 +231,7 @@ html, body {
 .song-card {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 15px;
-    padding: 1.5rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -248,7 +248,7 @@ html, body {
 
 .song-thumb {
     width: 100%;
-    height: 180px;
+    height: 140px;
     border-radius: 12px;
     object-fit: cover;
     margin-bottom: 1rem;
@@ -674,8 +674,6 @@ html, body {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 10px;
     padding: 1rem;
-    display: flex;
-    align-items: center;
     transition: transform 0.3s;
 }
 
@@ -684,17 +682,22 @@ html, body {
     background: rgba(255, 255, 255, 0.1);
 }
 
-.song-icon {
-    width: 50px;
-    height: 50px;
+.song-thumb {
+    width: 100%;
+    height: 150px;
     border-radius: 10px;
-    background: linear-gradient(45deg, #8b5cf6, #ec4899);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    margin-right: 1rem;
-    color: #ffffff;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.song-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.song-info {
+    margin-bottom: 1rem;
 }
 
 .song-info h5 {
@@ -706,6 +709,16 @@ html, body {
 .song-info p {
     font-size: 0.875rem;
     color: #b0b3b8;
+}
+
+.song-info small {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.song-actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
 .search-results-list {

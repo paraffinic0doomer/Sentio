@@ -267,10 +267,10 @@ class PlaylistController extends Controller
                 $url,
                 '--skip-download',
                 '--print-json',
-                '--no-warnings',
+                '--extract-flat',
+                '--socket-timeout', '5',
+                '--cache-dir', storage_path('app/yt-dlp-cache'),
                 '--quiet',
-                '--socket-timeout',
-                '10'
             ];
 
             $process = \Illuminate\Support\Facades\Process::run($command);
@@ -358,10 +358,9 @@ class PlaylistController extends Controller
                 $url,
                 '--skip-download',
                 '--print-json',
-                '--no-warnings',
-                '--quiet',
-                '--socket-timeout',
-                '10'
+                '--extract-flat',
+                '--socket-timeout', '5',
+                '--cache-dir', storage_path('app/yt-dlp-cache'),
             ];
 
             $process = \Illuminate\Support\Facades\Process::run($command);

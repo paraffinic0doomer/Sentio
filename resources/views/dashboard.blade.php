@@ -73,7 +73,9 @@
                     <div class="songs-grid">
                         @forelse($lastPlayed ?? [] as $song)
                             <div class="song-card">
-                                <img src="{{ $song->thumbnail ?? asset('images/cats.jpg') }}" alt="Thumbnail" class="song-thumb">
+                                <div class="song-thumb">
+                                    <img src="{{ $song->thumbnail ?? asset('images/cats.jpg') }}" alt="Thumbnail">
+                                </div>
                                 <div class="song-info">
                                     <h5>{{ $song->title }}</h5>
                                     <p>{{ $song->artist }}</p>
@@ -99,6 +101,81 @@
 
     <script>
         let currentSongData = null;
+
+        // Track page visibility to detect navigation vs refresh
+        let hasNavigatedAway = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user navigated back (not refreshed)
+            if (sessionStorage.getItem('hasNavigatedAway') === 'true') {
+                loadCachedRecommendations();
+                sessionStorage.removeItem('hasNavigatedAway');
+            }
+        });
+
+        // Mark when user navigates away
+        window.addEventListener('beforeunload', function() {
+            sessionStorage.setItem('hasNavigatedAway', 'true');
+        });
+
+        function loadCachedRecommendations() {
+            fetch('/get-recommendations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.recommendations && data.recommendations.length > 0) {
+                    displayRecommendations(data.recommendations, data.feeling, data.cached || false);
+                }
+            })
+            .catch(error => {
+                console.log('No cached recommendations found');
+            });
+        }
+
+        function displayRecommendations(recommendations, feeling, isCached = false) {
+            const section = document.getElementById('recommendations-section');
+            const grid = document.getElementById('recommendations-grid');
+
+            // Clear existing content
+            grid.innerHTML = '';
+
+            // Show section
+            section.style.display = 'block';
+
+            // Update header
+            const header = section.querySelector('h4');
+            header.textContent = `Recommendations for "${feeling}"`;
+
+            recommendations.forEach(song => {
+                const songCard = document.createElement('div');
+                songCard.className = 'song-card';
+                songCard.innerHTML = `
+                    <div class="song-thumb">
+                        <img src="${song.thumbnail || '/images/cats.jpg'}" alt="Thumbnail" onerror="this.src='/images/cats.jpg'">
+                    </div>
+                    <div class="song-info">
+                        <h5>${song.title}</h5>
+                        <p>${song.artist}</p>
+                    </div>
+                    <div class="song-actions">
+                        <button onclick="playSong('${song.id}', '${song.title}', '${song.artist}', '${song.thumbnail || ''}', '${song.url}')" class="play-btn">
+                            <i class="fas fa-play"></i> Play
+                        </button>
+                        <button onclick="showPlaylistForm('${song.id}', '${song.title}', '${song.artist}', '${song.url}', '${song.thumbnail || ''}')" class="add-btn">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(songCard);
+            });
+        }
+
         // Get Recommendations
         document.getElementById('get-recommendations-btn').addEventListener('click', function() {
             const mood = document.querySelector('.prompt-box textarea').value.trim();
@@ -119,28 +196,7 @@
                 .then(data => {
                     console.log('Recommendations data:', data);
                     if (data.status === 'success' && data.recommendations) {
-                        const section = document.getElementById('recommendations-section');
-                        const grid = document.getElementById('recommendations-grid');
-                        grid.innerHTML = '';
-
-                        data.recommendations.forEach(song => {
-                            const card = document.createElement('div');
-                            card.className = 'song-card';
-                            card.innerHTML = `
-                                <img src="${song.thumbnail || '/images/cats.jpg'}" alt="Thumbnail" class="song-thumb">
-                                <div class="song-info">
-                                    <h5>${song.title}</h5>
-                                    <p>${song.artist}</p>
-                                </div>
-                                <div class="song-actions">
-                                    <button class="play-btn" onclick="playSong('${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.thumbnail}', '${song.url}')"><i class="fas fa-play"></i> Play</button>
-                                    <button class="add-playlist-btn" onclick="showPlaylistForm('${song.id}', '${song.title}', '${song.artist}', '${song.url}', '${song.thumbnail}')"><i class="fas fa-plus"></i> Add</button>
-                                </div>
-                            `;
-                            grid.appendChild(card);
-                        });
-
-                        section.style.display = 'block';
+                        displayRecommendations(data.recommendations, data.feeling, data.cached || false);
                     } else {
                         console.error('No recommendations received:', data);
                         alert('Failed to get recommendations. Please try again.');
@@ -275,6 +331,8 @@
 
         // Play Song (save to database first, then redirect to player page)
         function playSong(songId, title, artist, thumbnail, url) {
+            console.log('playSong called with:', { songId, title, artist, thumbnail, url });
+
             fetch('/play-song', {
                 method: 'POST',
                 headers: {
@@ -291,6 +349,7 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('playSong response:', data);
                 if (data.status === 'success') {
                     window.location.href = `/player/${songId}`;
                 } else {

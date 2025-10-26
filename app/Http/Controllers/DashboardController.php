@@ -59,16 +59,57 @@ class DashboardController extends Controller
         $feeling = $request->input('feeling');
         Log::info('User feeling received: ' . $feeling);
 
-        // Get recommendations using LlmService (Groq + yt-dlp)
+        // Check if we have cached recommendations for this feeling
+        $cachedRecommendations = session('recommendations');
+        $cachedFeeling = session('recommendations_feeling');
+
+        // If no feeling provided and we have cached recommendations, return them
+        if (!$feeling && $cachedRecommendations) {
+            return response()->json([
+                'status' => 'success',
+                'feeling' => $cachedFeeling,
+                'recommendations' => $cachedRecommendations,
+                'cached' => true,
+            ]);
+        }
+
+        // If same feeling as cached, return cached results
+        if ($feeling && $cachedFeeling === $feeling && $cachedRecommendations) {
+            return response()->json([
+                'status' => 'success',
+                'feeling' => $feeling,
+                'recommendations' => $cachedRecommendations,
+                'cached' => true,
+            ]);
+        }
+
+        // Generate new recommendations
         $recommendations = $this->llm->getRecommendations($feeling);
 
-        // Note: We don't store recommendations in database until they're actually played
-        // This keeps the database clean and only tracks actually played songs
+        // Store in session for persistence across page loads
+        session([
+            'recommendations' => $recommendations,
+            'recommendations_feeling' => $feeling,
+        ]);
 
         return response()->json([
             'status' => 'success',
             'feeling' => $feeling,
             'recommendations' => $recommendations,
+            'cached' => false,
+        ]);
+    }
+
+    /**
+     * Clear cached recommendations
+     */
+    public function clearRecommendations()
+    {
+        session()->forget(['recommendations', 'recommendations_feeling']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Recommendations cleared',
         ]);
     }
 
@@ -77,17 +118,23 @@ class DashboardController extends Controller
      */
     public function playSong(Request $request)
     {
+        \Log::info('playSong called with data:', $request->all());
+
         $songId = $request->input('song_id');
         $title = $request->input('title');
         $artist = $request->input('artist');
         $thumbnail = $request->input('thumbnail');
         $url = $request->input('url');
 
+        \Log::info("Processing song: {$songId} - {$title} by {$artist}");
+
         // Ensure complete song data is in database
         $songData = $this->ensureCompleteSongData($songId, $url, $title, $artist, $thumbnail);
 
+        \Log::info('Song data after ensureCompleteSongData:', $songData);
+
         // Update or create the played song record
-        UserSong::updateOrCreate(
+        $song = UserSong::updateOrCreate(
             [
                 'user_id' => Auth::id(),
                 'song_id' => $songId,
@@ -100,6 +147,8 @@ class DashboardController extends Controller
                 'played_at' => now(),
             ]
         );
+
+        \Log::info('Song saved to database:', $song->toArray());
 
         return response()->json(['status' => 'success']);
     }
@@ -347,10 +396,9 @@ class DashboardController extends Controller
                 $url,
                 '--skip-download',
                 '--print-json',
-                '--no-warnings',
+                '--socket-timeout', '5',
+                '--cache-dir', storage_path('app/yt-dlp-cache'),
                 '--quiet',
-                '--socket-timeout',
-                '10'
             ];
 
             $process = \Illuminate\Support\Facades\Process::run($command);
@@ -381,10 +429,8 @@ class DashboardController extends Controller
                 $url,
                 '--skip-download',
                 '--print-json',
-                '--no-warnings',
-                '--quiet',
-                '--socket-timeout',
-                '10'
+                '--socket-timeout', '5',
+                '--cache-dir', storage_path('app/yt-dlp-cache'),
             ];
 
             $process = \Illuminate\Support\Facades\Process::run($command);

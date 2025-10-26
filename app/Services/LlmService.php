@@ -50,8 +50,8 @@ class LlmService
                 'ytsearch1:' . $query,
                 '--skip-download',
                 '--print-json',
-                '--no-warnings',
-                '--no-playlist',
+                '--socket-timeout', '5',
+                '--cache-dir', storage_path('app/yt-dlp-cache'),
                 '--quiet'
             ];
 
