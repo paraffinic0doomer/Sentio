@@ -255,19 +255,49 @@
     </div>
 
     <script>
-        function formatDuration(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        // Play Song (check if exists, save if not, then redirect to player page)
+        function playSong(songId, title, artist, thumbnail, url) {
+            console.log('playSong called with:', {songId, title, artist, thumbnail, url});
+            
+            // First, check if song exists
+            fetch('/check-song/' + songId)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Check song failed: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Song exists check:', data);
+                if (data.exists) {
+                    // Song exists, redirect directly
+                    console.log('Song exists, redirecting to player...');
+                    window.location.assign('/player/' + songId);
+                } else {
+                    // Song doesn't exist, save it first
+                    console.log('Song does not exist, saving...');
+                    return saveSong(songId, title, artist, thumbnail, url);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking song:', error);
+                alert('Failed to check song. Error: ' + error.message);
+            });
         }
 
-        // Play Song (save to database first, then redirect to player page)
-        function playSong(songId, title, artist, thumbnail, url) {
-            fetch('/play-song', {
+        function saveSong(songId, title, artist, thumbnail, url) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (!csrfToken) {
+                console.error('CSRF token not found!');
+                alert('CSRF token missing. Please refresh the page.');
+                return;
+            }
+            
+            return fetch('/play-song', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    'X-CSRF-TOKEN': csrfToken.getAttribute('content')
                 },
                 body: JSON.stringify({
                     song_id: songId,
@@ -278,23 +308,32 @@
                 })
             })
             .then(response => {
+                console.log('Save response:', response);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error('Save failed: ' + response.status);
                 }
                 return response.json();
             })
             .then(data => {
-                if (data.status === 'success') {
-                    alert('Redirecting to player...');
-                    window.location.assign(`/player/${songId}`);
+                console.log('Save data:', data);
+                if (data && data.status === 'success') {
+                    console.log('Song saved, redirecting to player...');
+                    window.location.assign('/player/' + songId);
                 } else {
-                    alert('Failed to play song. Please try again.');
+                    throw new Error('Unexpected save response: ' + JSON.stringify(data));
                 }
             })
             .catch(error => {
-                console.error('Error playing song:', error);
-                alert('Failed to play song. Please try again.');
+                console.error('Error saving song:', error);
+                alert('Failed to save song. Error: ' + error.message);
             });
+        }
+
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return mins + ':' + secs.toString().padStart(2, '0');
+        }
     </script>
 
     <!-- Playlist Modal -->

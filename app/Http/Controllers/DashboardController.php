@@ -275,6 +275,15 @@ class DashboardController extends Controller
         return response()->json(['status' => 'success']);
     }
 
+    public function checkSong($songId)
+    {
+        $exists = UserSong::where('user_id', Auth::id())
+            ->where('song_id', $songId)
+            ->exists();
+
+        return response()->json(['exists' => $exists]);
+    }
+
     /**
      * Ensure complete song data is in database, fetch missing data from yt-dlp
      */

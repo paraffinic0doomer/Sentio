@@ -24,6 +24,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/history', [DashboardController::class, 'history'])->name('history');
     Route::post('/play-song', [DashboardController::class, 'playSong'])->name('play.song');
+    Route::get('/check-song/{songId}', [DashboardController::class, 'checkSong'])->name('check.song');
     Route::post('/get-recommendations', [DashboardController::class, 'getRecommendations'])->name('get.recommendations');
     Route::post('/clear-recommendations', [DashboardController::class, 'clearRecommendations'])->name('clear.recommendations');
     Route::get('/profile', [DashboardController::class, 'showProfile'])->name('profile');

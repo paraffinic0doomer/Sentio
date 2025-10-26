@@ -43,14 +43,14 @@ class InvidiousController extends Controller
             // Use yt-dlp to search and get JSON results
             $command = [
                 'yt-dlp',
-                'ytsearch10:' . $query,  // Get 10 results
+                'ytsearch5:' . $query,  // Get 5 results (faster than 10)
                 '--skip-download',
                 '--print-json',
                 '--no-warnings',
                 '--quiet'
             ];
 
-            $process = Process::run($command);
+            $process = Process::timeout(300)->run($command);  // 5 minute timeout
 
             // yt-dlp returns exit code 101 when successful but with some conditions
             if ($process->successful() || $process->exitCode() === 101) {
@@ -80,6 +80,11 @@ class InvidiousController extends Controller
                 return collect($results);
             } else {
                 Log::error('yt-dlp search failed: ' . $process->errorOutput());
+                // Try with a different approach or fallback
+                if (str_contains($process->errorOutput(), 'timeout')) {
+                    Log::warning('yt-dlp search timed out, trying with reduced results');
+                    // Could try ytsearch5 instead of ytsearch10
+                }
             }
         } catch (\Exception $e) {
             Log::error('yt-dlp search failed: ' . $e->getMessage());
